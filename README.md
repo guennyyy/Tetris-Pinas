@@ -1,4 +1,4 @@
-# Tetris Pinas Auth Setup
+# Tetris-Pinas
 
 This project is ready for a real Firebase Authentication flow for:
 - Email/password sign up and login
