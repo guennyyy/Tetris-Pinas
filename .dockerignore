@@ -1,0 +1,9 @@
+﻿.git
+.vscode
+.env
+.env.*
+!.env.example
+.qa-*
+qa-*
+*-test.cjs
+node_modules
