@@ -1,0 +1,2 @@
+Built-in image_gen; background-extraction.
+Extract the TETRIS PINAS logo onto genuine alpha transparency. Preserve the gold text, Philippine sun, colored Tetris blocks and gold sparkles. Remove the dark brown rectangular background and decorative diagonal border at the top right. Preserve colors and letter shapes. Small transparent padding; no backdrop, rectangular panel, shadow rectangle or additional text.

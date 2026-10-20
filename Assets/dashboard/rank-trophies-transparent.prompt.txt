@@ -1,0 +1,1 @@
+Built-in image_gen; background-extraction. Remove all brown background, background light rays and surrounding haze to genuine alpha transparency. Preserve trophies, metallic detail, crowns, laurels, ribbons, numerals 2 left silver, 1 middle gold, 3 right bronze; original 2048 x 768 canvas, positions and sizes. Clean cutout edges; no brown circles or backdrop.

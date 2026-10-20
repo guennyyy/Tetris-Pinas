@@ -36,24 +36,36 @@
     }
     function applyState(state) {
         if (!state) return;
+        const retarget = player && (state.player.type !== player.type || state.player.y < player.y || state.player.rotation !== player.rotation);
+        if (retarget && pointerColumn !== null) {
+            const column=pointerColumn;pointerColumn=null;
+            point(column);
+        }
         board = state.board.map(row => row.slice());
         player = { ...state.player, matrix:state.player.matrix.map(row => row.slice()) };
         nextPiece = { ...state.next, matrix:state.next.matrix.map(row => row.slice()) };
+        queue = state.queue.slice();
+        heldType = state.heldType;
+        holdUsed = !!state.holdUsed;
         score = state.score; lines = state.lines; level = state.level;
-        updateStats(); drawNextPiece();
+        updateStats(); drawNextPiece(); drawHoldPiece();
     }
     function opponentPreview(opponent) {
         const card = $('opponentCard');
         card.classList.toggle('hidden', !opponent);
         if (!opponent) return;
         $('opponentName').textContent = opponent.name;
+        card.querySelector('.opponent-avatar').textContent = opponent.name.trim().slice(0,1).toUpperCase() || '★';
+        const live = card.querySelector('.opponent-live');
+        live.textContent = opponent.connected ? 'LIVE' : 'OFFLINE';
+        live.classList.toggle('is-offline', !opponent.connected);
         $('opponentProgress').textContent = `${Math.min(opponent.state?.lines || 0,40)} / 40 lines${opponent.connected ? '' : ' · offline'}`;
         const c = $('opponentCanvas').getContext('2d');
         c.fillStyle = '#1d1511'; c.fillRect(0,0,100,200);
         if (!opponent.state) return;
-        opponent.state.board.forEach((row,y) => row.forEach((type,x) => { if (type) { c.fillStyle=COLORS[type]; c.fillRect(x*10+1,y*10+1,8,8); } }));
+        opponent.state.board.forEach((row,y) => row.forEach((type,x) => { if (type && y>=HIDDEN_ROWS) { c.fillStyle=COLORS[type]; c.fillRect(x*10+1,(y-HIDDEN_ROWS)*10+1,8,8); } }));
         const p = opponent.state.player;
-        p.matrix.forEach((row,y) => row.forEach((v,x) => { if(v) { c.fillStyle=COLORS[p.type]; c.fillRect((p.x+x)*10+1,(p.y+y)*10+1,8,8); } }));
+        p.matrix.forEach((row,y) => row.forEach((v,x) => { if(v && p.y+y>=HIDDEN_ROWS) { c.fillStyle=COLORS[p.type]; c.fillRect((p.x+x)*10+1,(p.y+y-HIDDEN_ROWS)*10+1,8,8); } }));
     }
     function receive(message) {
         connected = true;
@@ -87,6 +99,7 @@
         $('menuRestart').classList.toggle('hidden', active);
         document.querySelectorAll('[data-game-page]').forEach(button => { button.disabled = active; });
         $('matchModeLabel').textContent = 'Online · 40 lines';
+        $('pauseButton').textContent = 'Match menu';
         if (room.status === 'finished') {
             handled.add(room.code);
             active = false;
@@ -98,6 +111,7 @@
             const won = room.winner === self.id;
             const reason = room.reason === '40-lines' ? 'The first player cleared 40 lines.' : room.reason === 'disconnect' ? 'The opponent did not reconnect in time.' : room.reason === 'forfeit' ? 'A player left the match.' : 'A player reached the top of the board.';
             resultDescription = `${room.winner ? (won ? 'You won this race!' : `${opponent?.name || 'Your opponent'} won this race.`) : 'No winner was declared.'} ${reason}`;
+            window.tetrisApp.onlineXp(room.xpAwards?.[self.id] || 0,room.code);
             window.tetrisApp.finish(room.winner ? (won ? 'online-win' : 'online-loss') : 'online-draw');
             $('playAgain').textContent = 'Play online again';
             return;
@@ -143,6 +157,24 @@
             $('matchClock').textContent = `${Math.min(lines,40)}/40 · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
         }
     }
+    let pointerColumn=null, pointerPending=false;
+    function point(column) {
+        if (column === null) { pointerColumn=null; return; }
+        if (pointerColumn === column) return;
+        if (!active || !connected || room?.status!=='playing' || $('matchMenu').open) return;
+        pointerColumn=column;
+        if (pointerPending) return;
+        sendPointer();
+    }
+    function sendPointer() {
+        if (!active || !connected || room?.status!=='playing' || $('matchMenu').open) {pointerColumn=null;return;}
+        pointerPending=true;
+        const column=pointerColumn;
+        actions=actions.then(()=>request('action',{action:'moveTo',column})).catch(error=>{if(active)report(error.message);}).finally(()=>{
+            pointerPending=false;
+            if(pointerColumn!==column && pointerColumn!==null)sendPointer();
+        });
+    }
     function input(action) {
         if (!active || !connected || room?.status !== 'playing' || $('matchMenu').open || pendingActions >= 20) return;
         pendingActions++;
@@ -181,5 +213,5 @@
     const invite = new URLSearchParams(location.search).get('room');
     if (invite && /^[A-Fa-f0-9]{7}$/.test(invite)) $('onlineRoomCode').value=invite.toUpperCase();
     controls();
-    window.onlinePlay={connect,input,tick,openMenu,noRestart,resumeView,cancelWaiting,get active(){return active;},get resultDescription(){return resultDescription;}};
+    window.onlinePlay={connect,input,point,tick,openMenu,noRestart,resumeView,cancelWaiting,get active(){return active;},get resultDescription(){return resultDescription;}};
 })();

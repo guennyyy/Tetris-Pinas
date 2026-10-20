@@ -1,0 +1,6 @@
+Tool: built-in image_gen (edit mode).
+Source: user-provided Filipino Festival Tetris Interface (1).png.
+Output: Assets/game/festival-background.png.
+
+Final prompt:
+Use case: precise-object-edit. Edit target: the supplied Filipino Festival Tetris Interface screenshot. Asset type: full-width landscape background artwork for a playable web game. Remove ALL UI overlays: Menu and Pause buttons, central black Tetris board and its frame, opponent board and portrait/name header, score/level/lines cards, Hold and Next panels, all tetromino blocks, grids, numbers and UI labels. Seamlessly reconstruct the festival illustration behind the removed areas. Preserve the original painted style, composition and edge artwork: colorful jeepney on left, festival costumes and decorations, old woman and child at lower left, church at upper right, boy riding carabao on right, Philippine flag and Pilipinas artwork at lower right. Preserve the warm orange, gold and deep blue palette. The middle 45 percent should be visually quieter warm brown festival street and subtle decorative textures, suitable behind live game panels. No added words, no game UI, no borders or frames, no blocks or grid. Keep original wide landscape aspect ratio.

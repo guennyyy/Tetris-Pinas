@@ -1,38 +1,103 @@
-﻿'use strict';
-const SHAPES = {
- I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], J:[[1,0,0],[1,1,1],[0,0,0]],
- L:[[0,0,1],[1,1,1],[0,0,0]], O:[[1,1],[1,1]], S:[[0,1,1],[1,1,0],[0,0,0]],
- T:[[0,1,0],[1,1,1],[0,0,0]], Z:[[1,1,0],[0,1,1],[0,0,0]]
-};
+'use strict';
+const core = require('./tetris-core.js');
 function createGame(seed) {
- let state=seed>>>0;
- const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
- const game={board:Array.from({length:20},()=>Array(10).fill(null)),player:null,next:null,score:0,lines:0,level:1,over:false,drop:0,bag:[],random};
- spawn(game);return game;
+    let randomState = seed >>> 0;
+    const random = () => { randomState = (Math.imul(randomState,1664525)+1013904223)>>>0; return randomState/4294967296; };
+    const game = {board:core.createBoard(),player:null,queue:[],heldType:null,holdUsed:false,score:0,lines:0,level:1,over:false,drop:0,lockElapsed:0,lockResets:0,combo:-1,backToBack:false,random};
+    spawn(game);
+    return game;
 }
 function take(game) {
- if(!game.bag.length){game.bag=Object.keys(SHAPES);for(let i=6;i>0;i--){const j=Math.floor(game.random()*(i+1));[game.bag[i],game.bag[j]]=[game.bag[j],game.bag[i]];}}
- const type=game.bag.pop();return {type,matrix:SHAPES[type].map(r=>r.slice()),x:0,y:0};
+    core.ensureQueue(game.queue,6,game.random);
+    return core.makePiece(game.queue.shift());
 }
-function collides(game,matrix=game.player.matrix,x=game.player.x,y=game.player.y){
- for(let row=0;row<matrix.length;row++)for(let col=0;col<matrix[row].length;col++)if(matrix[row][col]){
-  const bx=x+col,by=y+row;if(bx<0||bx>=10||by>=20||(by>=0&&game.board[by][bx]))return true;
- }return false;
+function collides(game,matrix=game.player.matrix,x=game.player.x,y=game.player.y) { return core.collides(game.board,matrix,x,y); }
+function spawn(game) {
+    game.player=take(game);
+    game.holdUsed=false;
+    game.lockElapsed=0;game.lockResets=0;
+    if(collides(game))game.over=true;
 }
-function spawn(game){game.player=game.next||take(game);game.next=take(game);game.player.x=5-Math.ceil(game.player.matrix[0].length/2);game.player.y=0;if(collides(game))game.over=true;}
-function lock(game){
- game.player.matrix.forEach((row,y)=>row.forEach((v,x)=>{if(v){const by=game.player.y+y;if(by<0)game.over=true;else game.board[by][game.player.x+x]=game.player.type;}}));
- let cleared=0;for(let y=19;y>=0;y--){if(game.board[y].every(Boolean)){game.board.splice(y,1);game.board.unshift(Array(10).fill(null));cleared++;y++;}}
- game.score+=[0,100,300,500,800][cleared]*game.level;game.lines+=cleared;game.level=1+Math.floor(game.lines/10);game.drop=0;
- if(!game.over&&game.lines<40)spawn(game);
+function lock(game) {
+    if(game.over||game.lines>=40)return;
+    const tSpin=core.isTSpin(game.board,game.player);
+    let hidden=false;
+    game.player.matrix.forEach((row,y)=>row.forEach((v,x)=>{
+        if(!v)return;
+        const by=game.player.y+y;
+        game.board[by][game.player.x+x]=game.player.type;
+        if(by<core.HIDDEN_ROWS)hidden=true;
+    }));
+    const count=core.clearLines(game.board).length;
+    game.combo=count?game.combo+1:-1;
+    const perfect=count>0&&game.board.every(row=>row.every(cell=>cell===null));
+    const result=core.scoreClear({count,level:game.level,tSpin,backToBack:game.backToBack,combo:game.combo,perfectClear:perfect});
+    game.score+=result.points;
+    if(count)game.backToBack=result.difficult;
+    game.lines+=count;
+    game.drop=0;
+    if(hidden)game.over=true;
+    if(!game.over&&game.lines<40)spawn(game);
 }
-function action(game,input){
- if(game.over||game.lines>=40)return;
- if(input==='left'||input==='right'){const direction=input==='left'?-1:1;if(!collides(game,game.player.matrix,game.player.x+direction))game.player.x+=direction;}
- else if(input==='rotate'){const matrix=game.player.matrix[0].map((_,i)=>game.player.matrix.map(row=>row[i]).reverse());for(const kick of [0,-1,1,-2,2])if(!collides(game,matrix,game.player.x+kick)){game.player.matrix=matrix;game.player.x+=kick;break;}}
- else if(input==='down'){if(!collides(game,game.player.matrix,game.player.x,game.player.y+1))game.player.y++;else lock(game);}
- else if(input==='drop'){let distance=0;while(!collides(game,game.player.matrix,game.player.x,game.player.y+1)){game.player.y++;distance++;}game.score+=distance*2;lock(game);}
+function action(game,input,column) {
+    if(game.over||game.lines>=40)return;
+    const p=game.player;
+    if(input==='moveTo'){
+        if(!Number.isInteger(column)||column<0||column>=core.WIDTH)return;
+        const cells=p.matrix.flatMap(row=>row.flatMap((v,x)=>v?[x]:[]));
+        const target=column-Math.min(...cells);
+        for(let i=0;i<core.WIDTH&&game.player.x!==target;i++){const before=game.player.x;action(game,target>before?'right':'left');if(game.player.x===before)break;}
+        return;
+    }
+    if(input==='left'||input==='right'){
+        const dx=input==='left'?-1:1,grounded=collides(game,p.matrix,p.x,p.y+1);
+        if(!collides(game,p.matrix,p.x+dx,p.y)){
+            p.x+=dx;p.lastRotation=false;
+            if(grounded&&game.lockResets<15){game.lockElapsed=0;game.lockResets++;}
+            if(!collides(game,p.matrix,p.x,p.y+1))game.lockElapsed=0;
+        }
+    } else if(input==='rotate'||input==='rotateCCW'){
+        const grounded=collides(game,p.matrix,p.x,p.y+1);
+        const rotated=core.rotate(game.board,p,input==='rotate');
+        if(rotated){
+            game.player=rotated;
+            if(grounded&&game.lockResets<15){game.lockElapsed=0;game.lockResets++;}
+            if(!collides(game,rotated.matrix,rotated.x,rotated.y+1))game.lockElapsed=0;
+        }
+    } else if(input==='down'){
+        if(!collides(game,p.matrix,p.x,p.y+1)){p.y++;p.lastRotation=false;game.score++;game.lockElapsed=0;}
+    } else if(input==='drop'){
+        let distance=0;
+        while(!collides(game,p.matrix,p.x,p.y+1)){p.y++;distance++;}
+        game.score+=distance*2;lock(game);
+    } else if(input==='hold'){
+        const previous=game.heldType;
+        game.heldType=p.type;
+        if(previous){
+            game.player=core.makePiece(previous);
+            game.lockElapsed=0;game.lockResets=0;
+            if(collides(game))game.over=true;
+        }else spawn(game);
+        game.holdUsed=true;
+    }
 }
-function tick(game,delta){if(game.over||game.lines>=40)return;game.drop+=delta;const interval=Math.max(100,850-(game.level-1)*70);if(game.drop>=interval){game.drop-=interval;action(game,'down');}}
-function snapshot(game){return {board:game.board,player:game.player,next:game.next,score:game.score,lines:game.lines,level:game.level,over:game.over};}
-module.exports={createGame,action,tick,snapshot,collides,SHAPES};
+function tick(game,delta) {
+    if(game.over||game.lines>=40)return;
+    game.drop+=Math.max(0,delta);
+    let steps=0;
+    const interval=core.getGravityMs(1);
+    while(game.drop>=interval&&steps++<1000){
+        game.drop-=interval;
+        if(collides(game,game.player.matrix,game.player.x,game.player.y+1)){game.drop=0;break;}
+        game.player.y++;
+        game.player.lastRotation=false;
+    }
+    if(collides(game,game.player.matrix,game.player.x,game.player.y+1)){
+        game.lockElapsed+=Math.max(0,delta);
+        if(game.lockElapsed>=500)lock(game);
+    } else game.lockElapsed=0;
+}
+function snapshot(game) {
+    return {board:game.board,player:game.player,next:core.makePiece(game.queue[0]),queue:game.queue.slice(0,5),heldType:game.heldType,holdUsed:game.holdUsed,score:game.score,lines:game.lines,level:game.level,over:game.over};
+}
+module.exports={createGame,action,tick,snapshot,collides,SHAPES:core.SHAPES};

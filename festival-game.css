@@ -1,0 +1,123 @@
+/* Supplied sun artwork behind the live game. */
+body:has(#gameScreen:not(.hidden)),body[data-theme=night]:has(#gameScreen:not(.hidden)) {
+    padding:0;
+    min-height:100svh;
+    display:flow-root;
+    background:linear-gradient(rgba(20,9,2,.26),rgba(20,9,2,.36)),url('Assets/game/sun-panel-background.png') center / cover fixed;
+}
+#gameScreen.game {
+    --play-height:min(740px,calc(100svh - 112px));
+    --board-width:calc((var(--play-height) - 20px) / 2 + 20px);
+    --side-width:clamp(170px,14vw,220px);
+    width:max-content;
+    max-width:calc(100% - 36px);
+    margin:84px auto 24px;
+    display:grid;
+    grid-template-columns:var(--side-width) var(--board-width) var(--side-width);
+    grid-template-areas:"stats board next";
+    align-items:start;
+    gap:22px;
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:none;
+    box-shadow:none;
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+}
+#gameScreen .brand { position:absolute; top:max(18px,env(safe-area-inset-top)); left:22px; right:22px; padding:0; filter:none; }
+#gameScreen .brand-row,#gameScreen .brand .location { display:none; }
+#gameScreen .match-toolbar { display:grid; grid-template-columns:1fr auto auto 1fr; gap:16px; margin:0; color:#fff1d1; font-size:14px; font-weight:750; text-shadow:0 2px 4px #160900; }
+#gameScreen .match-toolbar button { min-height:45px; padding:10px 17px; border:1px solid #ffdd8b; border-radius:10px; background:linear-gradient(135deg,rgba(84,39,7,.88),rgba(27,12,4,.9)); box-shadow:inset 0 0 0 2px #a86b323b,0 0 15px #ffb62233; color:#fff2db; font-size:14px; font-weight:750; letter-spacing:0; }
+#gameScreen #openMatchMenu { justify-self:start; }
+#gameScreen #pauseButton { justify-self:end; }
+#gameScreen #matchClock { font-variant-numeric:tabular-nums; }
+#gameScreen .side-panel { min-width:0; height:var(--play-height); padding:0; gap:12px; }
+#gameScreen .left-panel { justify-content:center; }
+#gameScreen .info-card,#gameScreen .hold-card,#gameScreen .next-card,#gameScreen .opponent-card {
+    position:relative;
+    flex-shrink:0;
+    border:1px solid #ffc954;
+    border-radius:13px;
+    background:linear-gradient(125deg,rgba(91,44,8,.88),rgba(25,12,3,.94) 65%);
+    box-shadow:inset 0 0 0 3px #8c4c1f44,inset 0 1px 0 #ffebba,0 0 12px #ffad3d3b,0 12px 25px #13090288;
+    -webkit-backdrop-filter:blur(9px);
+    backdrop-filter:blur(9px);
+}
+#gameScreen .info-card { flex:0 0 102px; display:flex; flex-direction:column; justify-content:center; }
+#gameScreen .info-card::before { content:""; position:absolute; left:6px; top:8px; bottom:8px; width:10px; opacity:.55; background:repeating-linear-gradient(45deg,transparent 0 4px,#d78b29 4px 5px,transparent 5px 9px); border-left:1px solid #e7a33a; }
+#gameScreen .info-card p { padding:0 8px 5px; border:0; color:#ffd58a; font-size:14px; }
+#gameScreen .info-card h2 { padding:0 8px; background:none; color:#fff7e6; font-size:32px; line-height:1.2; }
+#gameScreen .game-mode-info { padding:9px; border-color:#bc813c88; background:#251405c9; font-size:11px; }
+#gameScreen #gameLevelProgress { flex:none; height:7px; }
+#gameScreen .center { width:var(--board-width); }
+#gameScreen .board-frame { width:100%; max-width:none; margin:0; padding:8px; border:2px solid #ffcf68; border-radius:9px; background:linear-gradient(90deg,#502505,#f1b444 1%,#4c2309 2%,#2b1709 98%,#d99625 99%,#5e2d07); box-shadow:inset 0 0 0 2px #5d310e,0 0 0 2px #7c430e,0 0 19px #ffb73366,0 16px 30px #160a0788; -webkit-backdrop-filter:none; backdrop-filter:none; }
+#gameScreen .board-frame::after { content:""; position:absolute; inset:-4px; background:url('Assets/game/frame-ornament.svg') center / 100% 100% no-repeat; pointer-events:none; }
+#gameScreen #gameCanvas { width:100%; max-width:none; height:auto; border-radius:0; background:#130b05; }
+#gameScreen .game-message { inset:9px; border:0; border-radius:0; background:#1e1007d9; }
+#gameScreen .right-panel { gap:18px; }
+#gameScreen .hold-card { padding:10px 14px 12px; }
+#gameScreen .hold-card p,#gameScreen .next-card > p { padding:0 0 9px; border:0; color:#fff0ce; font-size:17px; letter-spacing:.5px; line-height:1.25; }
+#gameScreen .hold-card p small { display:block; margin-top:3px; font-size:9px; font-weight:500; color:#c49c6a; }
+#gameScreen #holdCanvas { width:100%; height:auto; max-height:calc(var(--play-height) * .16); object-fit:contain; background:#1d0e04; border-radius:7px; }
+#gameScreen .next-card { flex:1; min-height:0; display:flex; flex-direction:column; padding:12px 14px 14px; }
+#gameScreen #nextCanvas { flex:1; min-height:0; height:0; width:100%; max-width:none; margin:0; object-fit:contain; background:#1d0e04; border-radius:7px; }
+#gameScreen:not(.is-online) .opponent-card { display:none; }
+#gameScreen.is-online .left-panel { justify-content:start; }
+#gameScreen.is-online .opponent-card { flex:none; width:100%; padding:10px 12px; margin:0; }
+#gameScreen .opponent-heading { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+#gameScreen .opponent-heading p { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; font-weight:800; font-size:13px; }
+#gameScreen .opponent-avatar { display:grid; place-items:center; width:32px; height:32px; flex:none; border:1px solid #ffd46e; border-radius:50%; background:linear-gradient(140deg,#b56f20,#492508); color:#ffe4a0; }
+#gameScreen .opponent-live { font-size:8px; letter-spacing:1px; color:#94ecac; }
+#gameScreen .opponent-live.is-offline { color:#c9b494; }
+#gameScreen #opponentCanvas { width:auto; height:calc(var(--play-height) * .34); max-width:100%; margin:auto; border:1px solid #a77232; border-radius:2px; }
+#gameScreen .opponent-card small { margin-top:7px; font-size:10px; color:#f4d28e; }
+#gameScreen.is-online .info-card { flex:1; min-height:52px; }
+#gameScreen.is-online .info-card h2 { font-size:27px; }
+#gameScreen.is-online .info-card p { font-size:12px; }
+@media(max-width:760px) {
+    #gameScreen.game { --play-height:min(620px,calc(100svh - 110px)); --side-width:70px; max-width:calc(100% - 16px); gap:8px; margin-top:78px; grid-template-columns:70px minmax(0,var(--board-width)) 70px; }
+    #gameScreen .brand { left:10px; right:10px; top:12px; }
+    #gameScreen .match-toolbar { gap:8px; font-size:10px; }
+    #gameScreen .match-toolbar button { min-height:38px; padding:6px 10px; font-size:11px; }
+    #gameScreen .center { width:100%; }
+    #gameScreen .side-panel { height:auto; min-height:0; gap:8px; }
+    #gameScreen .info-card { flex:none; height:70px; }
+    #gameScreen .info-card p { font-size:9px; }
+    #gameScreen .info-card h2 { font-size:21px; }
+    #gameScreen .game-mode-info { padding:5px 3px; font-size:8px; }
+    #gameScreen .right-panel { align-self:stretch; }
+    #gameScreen .hold-card,#gameScreen .next-card { padding:8px 5px; border-radius:9px; }
+    #gameScreen .hold-card p,#gameScreen .next-card > p { font-size:10px; padding-bottom:5px; }
+    #gameScreen .hold-card p small { display:none; }
+    #gameScreen #holdCanvas { max-height:60px; }
+    #gameScreen #nextCanvas { min-height:0; }
+    #gameScreen.is-online .opponent-card { padding:5px 3px; }
+    #gameScreen .opponent-heading { flex-wrap:wrap; justify-content:center; gap:3px; }
+    #gameScreen .opponent-heading p { flex-basis:100%; text-align:center; font-size:9px; }
+    #gameScreen .opponent-avatar { width:24px; height:24px; }
+    #gameScreen .opponent-live { display:none; }
+    #gameScreen #opponentCanvas { width:100%; height:auto; }
+    #gameScreen .opponent-card small { font-size:8px; }
+    #gameScreen.is-online .info-card { flex:none; min-height:0; height:58px; }
+    #gameScreen.is-online .info-card p { font-size:9px; }
+    #gameScreen.is-online .info-card h2 { font-size:20px; }
+}
+@media(max-width:420px) {
+    #gameScreen.game { --side-width:54px; grid-template-columns:54px minmax(0,var(--board-width)) 54px; gap:6px; }
+    #gameScreen .board-frame { padding:5px; border-width:1px; }
+    #gameScreen .game-message { inset:6px; }
+    #gameScreen .info-card::before { display:none; }
+    #gameScreen .hold-card p,#gameScreen .next-card > p { font-size:8px; }
+}
+@media(max-height:580px) and (min-width:761px) {
+    #gameScreen.game { --side-width:150px; --play-height:calc(100svh - 88px); margin-top:68px; gap:14px; }
+    #gameScreen .side-panel { gap:6px; }
+    #gameScreen .info-card { flex:0 1 72px; }
+    #gameScreen .info-card h2 { font-size:23px; }
+    #gameScreen .info-card p { font-size:10px; }
+    #gameScreen.is-online .info-card { flex:1; min-height:35px; }
+    #gameScreen .game-mode-info { font-size:8px; padding:4px; }
+    #gameScreen .right-panel { gap:9px; }
+    #gameScreen .hold-card p,#gameScreen .next-card > p { font-size:12px; }
+}

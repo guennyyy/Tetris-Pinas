@@ -4,6 +4,13 @@
 .hub-logo { text-decoration: none; color: var(--cream); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
 .hub-logo span { color: var(--gold); }
 .account-chip { display: flex; align-items: center; gap: 8px; padding: 7px 12px; font-size: 12px; max-width: 45%; text-transform: none; }
+.account-chip.active { outline: 2px solid var(--gold); outline-offset: 3px; }
+.sidebar-bottom { padding: 14px; }
+.sidebar-bottom .account-chip { width: 100%; max-width: none; text-align: left; padding: 12px; }
+.account-details { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.account-details small { color: #c3ae91; font-size: 11px; font-weight: 400; }
+.sidebar-bottom #accountAvatar { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: #d69d3430; }
+.sidebar-utilities { margin-top: 14px; border-bottom: 0; padding: 0; }
 #accountName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #accountAvatar { font-size: 22px; }
 .hub-nav { display: flex; gap: 6px; padding: 12px 24px; border-bottom: 1px solid #e7b66d26; overflow-x: auto; }
@@ -94,6 +101,21 @@
 body[data-theme=night] { background: #10151c; }
 body[data-theme=night] .hub, body[data-theme=night] .game { background: #151c25; }
 .game.with-buttons { grid-template-areas: "brand brand brand" "stats board next" "footer footer footer"; }
+@media (min-width: 951px), (min-width: 701px) and (orientation: portrait) {
+    body:has(#hubScreen:not(.hidden)) { padding: 0; background: #24170f; }
+    .hub { width: 100%; min-height: 100vh; min-height: 100svh; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: linear-gradient(145deg, #24170f, #412310); }
+    .hub:not(.hidden) { display: grid; grid-template-columns: clamp(280px, 23vw, 340px) minmax(0, 1fr); grid-template-rows: 1fr auto auto; overflow: visible; }
+    .hub-sidebar { grid-column: 1; grid-row: 1 / 4; position: sticky; top: 0; height: 100vh; height: 100svh; display: flex; flex-direction: column; background: #1e140e; border-right: 1px solid #e7b66d26; overflow-y: auto; }
+    .hub-header { padding: 28px 20px; border-bottom: 0; }
+    .hub-logo { font-size: 21px; }
+    .hub-nav { flex-direction: column; overflow-x: visible; padding: 12px 14px; border-bottom: 0; }
+    .hub-nav button { flex: none; text-align: left; padding: 14px 16px; font-size: 14px; }
+    .sidebar-bottom { margin-top: auto; border-top: 1px solid #e7b66d26; }
+    .sidebar-utilities { padding: 0; }
+    .hub-page { grid-column: 2; grid-row: 1; min-width: 0; padding: 36px; }
+    .hub-notice { grid-column: 2; grid-row: 2; }
+    .hub-footer { grid-column: 2; grid-row: 3; }
+}
 @media (max-width:700px), (max-width:950px) and (orientation:landscape) {
     .hub { border-radius: 18px; }
     .hub-header { padding: 16px 14px; }
@@ -158,3 +180,52 @@ button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 }
 .game.is-online .tip-card { display: none; }
 .game.is-online .opponent-card { margin-bottom: 4px; }
+
+/* Readable hub typography, with room for larger controls and player details. */
+.hub { font-size: 16px; line-height: 1.5; }
+.hub-page h1 { font-size: clamp(32px, 3vw, 46px); }
+.hub-page h2 { font-size: 24px; }
+.hub .welcome > p:last-child, .hub .muted,
+.hub .mode-card > span:last-of-type, .hub .guide-card p,
+.hub .online-invite p:last-child, .hub .online-status,
+.hub .online-error, .hub .empty-state { font-size: 16px; color: #e2cdb0; }
+.hub .eyebrow, .hub .mode-tag { font-size: 12px; letter-spacing: 1.4px; }
+.hub .summary-strip span { font-size: 12px; color: #e2c49b; }
+.hub .summary-strip strong { font-size: clamp(28px, 3vw, 38px); }
+.hub .summary-strip > div { padding: 20px 16px; }
+.hub .mode-card { padding: 26px; min-height: 270px; gap: 4px; }
+.hub .mode-card strong { font-size: 28px; line-height: 1.25; }
+.hub .mode-symbol { font-size: 36px; }
+.hub .mode-card b, .hub .text-button, .hub .section-heading > span,
+.hub .hub-footer, .hub .hub-notice { font-size: 14px; }
+.hub .resume-match, .hub .online-invite button, .hub .online-choices button,
+.hub .online-lobby button, .hub .hub-form button, .hub .result-actions button,
+.hub .settings-list > button { font-size: 15px; min-height: 48px; }
+.hub .hub-form label, .hub .filter-label, .hub #joinOnlineForm label,
+.hub .guide-card dl, .hub .history-row strong, .hub .ranking-row strong,
+.hub .setting-row strong, .hub .achievement strong { font-size: 16px; }
+.hub .history-row small, .hub .ranking-row small, .hub .setting-row small,
+.hub .achievement small, .hub .achievement b, .hub .ranking-header { font-size: 14px; }
+.hub .hub-nav button { font-size: 16px; min-height: 48px; }
+.hub .account-chip { font-size: 18px; }
+.hub .account-details small { font-size: 14px; }
+.hub #accountAvatar { width: 52px; height: 52px; font-size: 30px; }
+@media (min-width: 951px), (min-width: 701px) and (orientation: portrait) {
+    .hub-header { padding: 32px 24px; }
+    .hub-logo { font-size: 26px; }
+    .hub-nav { padding: 16px 20px; gap: 10px; }
+    .hub .hub-nav button { font-size: 18px; padding: 16px 20px; min-height: 56px; }
+    .sidebar-bottom { padding: 24px 20px; }
+    .sidebar-bottom .account-chip { padding: 16px; gap: 14px; }
+    .sidebar-utilities { padding: 0; margin-top: 20px; }
+    .hub-page { padding: clamp(28px, 3vw, 52px); }
+    .hub .online-choices { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+    .hub .achievement-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+}
+@media (max-width: 700px) {
+    .hub .mode-card { padding: 18px 14px; }
+    .hub .mode-card strong { font-size: 23px; }
+    .hub .summary-strip > div { padding: 14px 8px; }
+    .hub .summary-strip span { font-size: 11px; letter-spacing: 0; }
+    .hub .hub-form { grid-template-columns: 1fr; }
+}

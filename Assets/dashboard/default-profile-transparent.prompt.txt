@@ -1,0 +1,1 @@
+Built-in image_gen; background-extraction. Remove only the white background from the goat photograph to true alpha transparency. Preserve the exact goat, fur, face, ears, horns, pose and square composition. Clean fur edges, no white rectangle, no new shadow, no changes to the animal. Transparent PNG for a small profile picture.

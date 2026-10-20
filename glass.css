@@ -1,0 +1,173 @@
+/* Translucent surfaces shared by the dashboard, menus, and game. */
+:root {
+    --glass-blur: blur(18px) saturate(145%);
+    --glass-light-border: rgba(255, 255, 255, .8);
+    --glass-light-shadow: 0 12px 28px rgba(90, 51, 25, .12), inset 0 1px 0 rgba(255, 255, 255, .9);
+    --glass-dark-border: rgba(255, 230, 180, .36);
+    --glass-dark-shadow: 0 16px 40px rgba(19, 10, 8, .3), inset 0 1px 0 rgba(255, 255, 255, .19);
+}
+
+/* Give the light glass a little depth without covering the header illustration. */
+#page-home {
+    background: radial-gradient(circle at 75% 22%, rgba(255, 216, 155, .24), transparent 38%),
+                radial-gradient(circle at 20% 75%, rgba(255, 255, 255, .9), transparent 44%),
+                #faf7f0;
+}
+.hub .friends-panel,
+.hub .marathon-progress,
+.hub .guide-card,
+.hub .achievement,
+.hub .online-lobby,
+.hub .online-status,
+.hub .summary-strip > div,
+.hub .profile-card,
+.hub .setting-row,
+.hub .ranking-row,
+.hub .history-row,
+.hub .empty-state {
+    background: linear-gradient(145deg, rgba(255, 255, 255, .79), rgba(255, 247, 229, .48));
+    border: 1px solid var(--glass-light-border);
+    box-shadow: var(--glass-light-shadow);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+.hub .friends-panel,
+.hub .marathon-progress,
+.hub .guide-card,
+.hub .achievement,
+.hub .online-lobby,
+.hub .online-status,
+.hub .summary-strip > div,
+.hub .profile-card,
+.hub .empty-state { border-radius: 16px; }
+.hub .profile-card { padding: 18px; }
+.hub .setting-row,
+.hub .ranking-row,
+.hub .history-row { border-radius: 12px; margin-bottom: 8px; padding-inline: 16px; }
+.hub .marathon-progress { background: linear-gradient(145deg, rgba(255, 239, 194, .79), rgba(255, 213, 137, .48)); }
+.hub .friend-card {
+    background: rgba(255, 255, 255, .5);
+    border-color: rgba(255, 255, 255, .82);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+.hub .online-invite {
+    border-color: rgba(255, 255, 255, .75);
+    background: linear-gradient(90deg, rgba(255, 249, 237, .85) 20%, rgba(255, 248, 236, .65) 38%, rgba(255, 255, 255, .08) 68%),
+                url('Assets/dashboard/online.png') right center / auto 100% no-repeat,
+                #eed6bd;
+    box-shadow: var(--glass-light-shadow);
+    -webkit-backdrop-filter: blur(10px) saturate(125%);
+    backdrop-filter: blur(10px) saturate(125%);
+}
+.hub .mode-card {
+    background: linear-gradient(150deg, rgba(255, 244, 207, .74), rgba(255, 255, 255, .66));
+    border-color: rgba(255, 255, 255, .86);
+    box-shadow: var(--glass-light-shadow);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+.hub .mode-card[data-mode=sprint] { background: linear-gradient(150deg, rgba(255, 220, 215, .75), rgba(255, 255, 255, .67)); }
+.hub .mode-card[data-mode=blitz] { background: linear-gradient(150deg, rgba(211, 230, 255, .76), rgba(255, 255, 255, .67)); }
+.hub .mode-card[data-mode=practice] { background: linear-gradient(150deg, rgba(217, 243, 217, .76), rgba(255, 255, 255, .67)); }
+.hub .mode-card:hover { box-shadow: 0 18px 32px rgba(90, 51, 25, .2), inset 0 1px 0 #fff; }
+.hub .mode-card b,
+.hub .online-invite button,
+.hub .resume-match,
+.hub .online-choices button,
+.hub .online-lobby button,
+.hub .hub-form button,
+.hub .result-actions button,
+.hub .settings-list > button,
+.hub .hub-nav button.active {
+    border: 1px solid rgba(255, 255, 255, .78);
+    background: linear-gradient(155deg, rgba(255, 223, 137, .92), rgba(236, 151, 34, .8));
+    box-shadow: 0 7px 16px rgba(109, 53, 9, .18), inset 0 1px 0 rgba(255, 255, 255, .75);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(12px) saturate(150%);
+}
+.hub .mode-card[data-mode=sprint] b { background: linear-gradient(155deg, rgba(255, 96, 111, .93), rgba(202, 20, 49, .86)); }
+.hub .mode-card[data-mode=blitz] b { background: linear-gradient(155deg, rgba(82, 157, 255, .93), rgba(26, 67, 204, .86)); }
+.hub .mode-card[data-mode=practice] b { background: linear-gradient(155deg, rgba(76, 195, 119, .93), rgba(8, 117, 69, .87)); }
+.hub .hub-nav button:not(.active):hover { background: rgba(255, 244, 212, .16); border-color: rgba(255, 231, 174, .4); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.hub .sidebar-bottom .account-chip,
+.hub .player-level {
+    background: linear-gradient(145deg, rgba(99, 58, 35, .58), rgba(38, 19, 15, .6));
+    border-color: rgba(255, 211, 133, .49);
+    box-shadow: var(--glass-dark-shadow);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+.hub input:not([type=checkbox]), .hub select {
+    background: rgba(255, 255, 255, .58);
+    border-color: rgba(255, 255, 255, .82);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+
+/* The play screen uses darker glass so the blocks and score remain legible. */
+.game,
+.auth-panel,
+.match-menu {
+    background: linear-gradient(155deg, rgba(76, 43, 35, .67), rgba(29, 19, 30, .75));
+    border: 1px solid var(--glass-dark-border);
+    box-shadow: var(--glass-dark-shadow);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+}
+.game .info-card,
+.game .next-card,
+.game .bottom-panel,
+.game .opponent-card {
+    background: linear-gradient(145deg, rgba(255, 230, 190, .22), rgba(56, 33, 35, .48));
+    border: 1px solid var(--glass-dark-border);
+    box-shadow: var(--glass-dark-shadow);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+.game .info-card h2 { background: rgba(24, 17, 27, .28); text-shadow: 0 2px 12px rgba(0, 0, 0, .6); }
+.game .info-card p, .game .next-card > p { border-bottom-color: rgba(255, 255, 255, .22); }
+.game .board-frame {
+    border: 1px solid rgba(255, 245, 217, .56);
+    background: linear-gradient(145deg, rgba(255, 237, 202, .34), rgba(66, 40, 53, .49));
+    box-shadow: 0 16px 32px rgba(13, 9, 17, .38), inset 0 1px 0 rgba(255, 255, 255, .55), 0 0 0 1px rgba(255, 216, 158, .16);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+.game #gameCanvas { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 8px 20px rgba(0, 0, 0, .3); }
+.game .game-message {
+    background: rgba(24, 17, 29, .7);
+    border: 1px solid rgba(255, 255, 255, .27);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}
+.game button,
+.auth-panel .tab-button,
+.auth-panel .primary-button,
+.auth-panel .social-button,
+.match-menu button {
+    background: linear-gradient(155deg, rgba(255, 210, 137, .6), rgba(156, 81, 51, .53));
+    border: 1px solid rgba(255, 237, 191, .61);
+    box-shadow: 0 6px 14px rgba(16, 8, 14, .23), inset 0 1px 0 rgba(255, 255, 255, .45);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(12px) saturate(150%);
+}
+.game button:hover,
+.auth-panel button:hover,
+.match-menu button:hover { filter:brightness(1.12); box-shadow:0 9px 19px rgba(16, 8, 14, .3), inset 0 1px 0 rgba(255, 255, 255, .57); }
+.auth-panel .tab-button.active { background: linear-gradient(155deg, rgba(255, 211, 132, .82), rgba(190, 95, 42, .72)); }
+.auth-panel input,
+.auth-panel .account-picker,
+.auth-panel .account-item {
+    background: rgba(34, 22, 32, .48);
+    border-color: rgba(255, 230, 185, .3);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+body[data-theme=night] .game { background:linear-gradient(155deg,rgba(32, 42, 59, .7),rgba(13, 22, 37, .79)); }
+body[data-theme=night] .hub .friends-panel,
+body[data-theme=night] .hub .guide-card,
+body[data-theme=night] .hub .mode-card { background:linear-gradient(145deg,rgba(255, 255, 255, .17),rgba(255, 255, 255, .08)); }
+
+@media (prefers-reduced-transparency: reduce) {
+    .game, .auth-panel, .match-menu { background:#38251f; }
+    .hub .friends-panel, .hub .mode-card, .hub .guide-card { background:#fff8ed; }
+}

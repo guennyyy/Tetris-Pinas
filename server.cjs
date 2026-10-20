@@ -7,7 +7,25 @@ const engine=require('./multiplayer-engine.cjs');
 function createMultiplayerServer(options={}) {
  const sessions=new Map(),players=new Map(),rooms=new Map(),ipLimits=new Map();
  const root=__dirname;
- const allowedFiles=new Set(['index.html','style.css','app.css','app.js','game.js','online.js','background.jfif','bg-fiesta.svg']);
+ const accountFile=options.accountFile||path.join(root,'.tetris-accounts.json');
+ let accounts={};
+ try { accounts=JSON.parse(fs.readFileSync(accountFile,'utf8')); } catch { accounts={}; }
+ const saveAccounts=()=>{const temporary=accountFile+'.tmp';fs.writeFileSync(temporary,JSON.stringify(accounts),{mode:0o600});fs.renameSync(temporary,accountFile);};
+ const passwordHash=(password,salt)=>crypto.scryptSync(password,salt,64).toString('hex');
+ const allowedFiles=new Set(['index.html','style.css','app.css','dashboard.css','glass.css','mechanics.css','amber-glass.css','tetris-core.js','app.js','game.js','online.js','friends.js','background.jfif','board-background.jfif','bg-fiesta.svg']);
+ for(const name of ['logo','logo-original','sidebar-art','sidebar-full-v2','sunset','online','marathon','sprint','blitz','practice','trophy','controller','blocks','avatar']) allowedFiles.add(`Assets/dashboard/${name}.png`);
+ for(const name of ['play','online','guide','settings','trophy','edit','star','gamepad','clock']) allowedFiles.add(`Assets/dashboard/icons/${name}.png`);
+ for(const name of ['marathon','sprint','blitz','practice']) allowedFiles.add(`Assets/dashboard/${name}-extended.png`);
+ for (const file of ['festival-game.css','Assets/game/sun-panel-background.png','Assets/game/frame-ornament.svg','Assets/game/board-sun.svg','Assets/game/festival-background.png']) allowedFiles.add(file);
+ allowedFiles.add('Assets/dashboard/rank-trophies.png');
+ allowedFiles.add('Assets/dashboard/rank-trophies-transparent.png');
+ allowedFiles.add('Assets/dashboard/icons/google.jfif');
+ allowedFiles.add('Assets/dashboard/icons/facebook.png');
+ allowedFiles.add('Assets/dashboard/logo-transparent.png');
+ allowedFiles.add('Assets/dashboard/intro-logo.png');
+ allowedFiles.add('Assets/dashboard/sidebar-background-v3.png');
+ allowedFiles.add('Assets/dashboard/default-profile.jfif');
+ allowedFiles.add('Assets/dashboard/default-profile-transparent.png');
  const clock=options.now||Date.now;
  const grace=options.disconnectGrace||30000;
  const countdown=options.countdown??3000;
@@ -15,13 +33,15 @@ function createMultiplayerServer(options={}) {
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
  const error=(status,message)=>Object.assign(new Error(message),{status});
  function roomOf(s){return rooms.get(s.room);}
- function payload(s){const room=roomOf(s);return {self:{id:s.id,name:s.name},connected:true,online:[...sessions.values()].filter(p=>p.stream).length,room:room?{
-  code:room.code,visibility:room.visibility,status:room.status,startAt:room.startAt,now:clock(),winner:room.winner,reason:room.reason,
+ function payload(s){const room=roomOf(s);return {self:{id:s.id,name:s.name,xp:s.xp||0,accountId:s.accountId||null},connected:true,online:[...sessions.values()].filter(p=>p.stream).length,room:room?{
+  code:room.code,visibility:room.visibility,status:room.status,startAt:room.startAt,now:clock(),winner:room.winner,reason:room.reason,xpAwards:room.xpAwards||{},
   players:room.players.map(sid=>{const p=players.get(sid);return {id:sid,name:p.name,connected:!!p.stream,state:room.games?.[sid]?engine.snapshot(room.games[sid]):null};})
  }:null};}
  function emit(s){if(s?.stream&&!s.stream.destroyed){if(s.stream.writableLength>262144){s.stream.destroy();return;}s.stream.write(`data: ${JSON.stringify(payload(s))}\n\n`);}}
  function broadcast(room){for(const sid of room.players)emit(players.get(sid));}
- function finish(room,winner,reason){if(room.status==='finished')return;room.status='finished';room.winner=winner;room.reason=reason;room.finishedAt=clock();broadcast(room);}
+ function finish(room,winner,reason){if(room.status==='finished')return;room.status='finished';room.winner=winner;room.reason=reason;room.finishedAt=clock();room.xpAwards={};
+  if((reason==='40-lines'||reason==='topout')&&room.finishedAt-room.startAt>=15000){for(const sid of room.players){const s=players.get(sid),opponent=room.players.find(id=>id!==sid);s.xpHistory=(s.xpHistory||[]).filter(item=>room.finishedAt-item.at<86400000);if(s.xpHistory.length>=10||s.xpHistory.some(item=>item.opponent===opponent&&room.finishedAt-item.at<300000))continue;const award=75+(sid===winner?50:0);s.xpHistory.push({at:room.finishedAt,opponent});s.xp=(s.xp||0)+award;room.xpAwards[sid]=award;}}
+  broadcast(room);}
  function resolve(room){if(room.status!=='playing')return;for(const sid of room.players){const game=room.games[sid];if(game.lines>=40){finish(room,sid,'40-lines');return;}if(game.over){finish(room,room.players.find(p=>p!==sid),'topout');return;}}}
  function leave(s){const room=roomOf(s);if(room){if(room.status==='playing'||room.status==='countdown')finish(room,room.players.find(p=>p!==s.id)||null,'forfeit');else if(room.status==='waiting'){rooms.delete(room.code);}}
   s.room=null;emit(s);
@@ -56,17 +76,25 @@ function createMultiplayerServer(options={}) {
    if(!url.pathname.startsWith('/api/')){
     if(req.method!=='GET'&&req.method!=='HEAD')throw error(405,'Method not allowed.');
     const file=url.pathname==='/'?'index.html':url.pathname.slice(1);if(!allowedFiles.has(file))throw error(404,'Not found.');
-    const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.jfif':'image/jpeg','.svg':'image/svg+xml'};
+    const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.jfif':'image/jpeg','.svg':'image/svg+xml','.png':'image/png'};
     res.writeHead(200,{'Content-Type':mime[path.extname(file)],'Cache-Control':'no-cache'});if(req.method==='HEAD')res.end();else fs.createReadStream(path.join(root,file)).pipe(res);return;
    }
    const ip=req.socket.remoteAddress;const limit=ipLimits.get(ip)||{at:clock(),count:0};if(clock()-limit.at>60000){limit.at=clock();limit.count=0;}limit.count++;ipLimits.set(ip,limit);if(limit.count>6000)throw error(429,'Too many requests. Try again shortly.');
    let token=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('tetrisSession='))?.slice(14);
    let s=sessions.get(token);
    if(req.method==='GET'&&url.pathname==='/api/session'){
-    if(!s){if(sessions.size>=2000)throw error(503,'The server is full.');token=id();s={id:crypto.randomUUID(),name:'Player',room:null,stream:null,lastSeen:clock(),disconnectedAt:clock(),actionWindow:0,actions:0};sessions.set(token,s);players.set(s.id,s);res.setHeader('Set-Cookie',`tetrisSession=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400${process.env.NODE_ENV==='production'?'; Secure':''}`);}
+    if(!s){if(sessions.size>=2000)throw error(503,'The server is full.');token=id();s={id:crypto.randomUUID(),name:'Player',room:null,stream:null,lastSeen:clock(),disconnectedAt:clock(),actionWindow:0,actions:0,xp:0,xpHistory:[]};sessions.set(token,s);players.set(s.id,s);res.setHeader('Set-Cookie',`tetrisSession=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400${process.env.NODE_ENV==='production'?'; Secure':''}`);}
     s.lastSeen=clock();json(res,200,payload(s));return;
    }
    if(!s)throw error(401,'Open the online lobby first.');s.lastSeen=clock();
+   if(req.method==='GET'&&url.pathname==='/api/people'){
+    const online=[...sessions.values()].filter(p=>p.id!==s.id&&(!!p.stream||clock()-p.lastSeen<45000)).map(p=>({id:p.id,name:p.name}));
+    json(res,200,{self:s.id,players:online});return;
+   }
+   if(req.method==='GET'&&url.pathname==='/api/auth'){
+    const account=s.accountId?accounts[s.accountId]:null;
+    json(res,200,{user:account?{id:account.id,name:account.name,email:account.email}:null});return;
+   }
    if(req.method==='GET'&&url.pathname==='/api/events'){
     if(s.stream){json(res,409,{error:'This player is already connected in another tab. Use a different browser or private window for player two.'});return;}
     res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});res.flushHeaders();s.stream=res;emit(s);
@@ -79,12 +107,35 @@ function createMultiplayerServer(options={}) {
    if(req.headers['x-tetris-request']!=='1')throw error(403,'Missing request header.');
    const data=await body(req);
    if(!data||typeof data!=='object'||Array.isArray(data))throw error(400,'Request must be a JSON object.');
-   if(url.pathname==='/api/profile'){if(roomOf(s)?.status==='playing')throw error(409,'Change your name after the match.');s.name=String(data.name||'Player').trim().slice(0,24)||'Player';emit(s);json(res,200,{ok:true});return;}
+   if(url.pathname==='/api/signup'||url.pathname==='/api/login'){
+    if(roomOf(s)?.status==='playing')throw error(409,'Finish the match before changing accounts.');
+    if(s.authBlockedUntil>clock())throw error(429,'Too many sign-in attempts. Try again later.');
+    const email=String(data.email||'').trim().toLowerCase(),password=String(data.password||'');
+    if(!/^[a-z0-9._%+-]+@gmail\.com$/.test(email)||password.length<8||password.length>128)throw error(400,'Use a Gmail address and a password of 8 to 128 characters.');
+    let account=Object.values(accounts).find(a=>a.email===email);
+    if(url.pathname==='/api/signup'){
+     const name=String(data.name||'').trim().slice(0,24);
+     if(!name)throw error(400,'Enter a display name.');
+     if(account)throw error(409,'This Gmail account already exists. Log in instead.');
+     const salt=crypto.randomBytes(16).toString('hex');
+     account={id:crypto.randomUUID(),email,name,salt,passwordHash:passwordHash(password,salt),createdAt:clock()};
+     accounts[account.id]=account;saveAccounts();
+    }else{
+     const candidate=passwordHash(password,account?.salt||'0'.repeat(32));
+     if(!account||!crypto.timingSafeEqual(Buffer.from(candidate,'hex'),Buffer.from(account.passwordHash,'hex'))){
+      s.authFails=(s.authFails||0)+1;if(s.authFails>=5){s.authBlockedUntil=clock()+900000;s.authFails=0;}
+      throw error(401,'Incorrect email or password.');
+     }
+    }
+    s.authFails=0;s.accountId=account.id;s.name=account.name;emit(s);json(res,200,{user:{id:account.id,name:account.name,email:account.email}});return;
+   }
+   if(url.pathname==='/api/logout'){if(roomOf(s)?.status==='playing')throw error(409,'Finish the match before signing out.');s.accountId=null;s.name='Player';emit(s);json(res,200,{ok:true});return;}
+   if(url.pathname==='/api/profile'){if(roomOf(s)?.status==='playing')throw error(409,'Change your name after the match.');s.name=String(data.name||'Player').trim().slice(0,24)||'Player';if(s.accountId&&accounts[s.accountId]){accounts[s.accountId].name=s.name;saveAccounts();}emit(s);json(res,200,{ok:true});return;}
    if(url.pathname==='/api/leave'){leave(s);json(res,200,{ok:true});return;}
    if(!s.stream)throw error(409,'The live connection is not ready. Please reconnect.');
    if(url.pathname==='/api/action'){
-    const room=roomOf(s);if(!room||room.status!=='playing')throw error(409,'The match is not playing yet.');if(!['left','right','rotate','down','drop'].includes(data.action))throw error(400,'Unknown action.');
-    if(clock()-s.actionWindow>=1000){s.actions=0;s.actionWindow=clock();}if(++s.actions>60)throw error(429,'Input limit reached.');engine.action(room.games[s.id],data.action);resolve(room);broadcast(room);json(res,200,{ok:true});return;
+    const room=roomOf(s);if(!room||room.status!=='playing')throw error(409,'The match is not playing yet.');if(!['left','right','rotate','rotateCCW','hold','down','drop','moveTo'].includes(data.action))throw error(400,'Unknown action.');
+    if(clock()-s.actionWindow>=1000){s.actions=0;s.actionWindow=clock();}if(++s.actions>60)throw error(429,'Input limit reached.');if(data.action==='moveTo'&&(!Number.isInteger(data.column)||data.column<0||data.column>9))throw error(400,'Invalid column.');engine.action(room.games[s.id],data.action,data.column);resolve(room);broadcast(room);json(res,200,{ok:true});return;
    }
    if(roomOf(s)&&roomOf(s).status!=='finished')throw error(409,'Leave your current room first.');
    if(s.room)leave(s);

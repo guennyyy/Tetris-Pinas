@@ -14,7 +14,7 @@ const context =
     canvas.getContext("2d");
 
 const boardBackgroundImage = new Image();
-boardBackgroundImage.src = "board-background.jfif";
+boardBackgroundImage.src = "Assets/game/sun-panel-background.png";
 
 
 const nextCanvas =
@@ -30,6 +30,8 @@ const nextContext =
 
 const COLS = 10;
 const ROWS = 20;
+const HIDDEN_ROWS = TetrisCore.HIDDEN_ROWS;
+const BOARD_ROWS = TetrisCore.HEIGHT;
 const BLOCK = 30;
 
 
@@ -115,6 +117,18 @@ let board;
 let player;
 
 let nextPiece;
+let queue = [];
+let heldType = null;
+let holdUsed = false;
+let lockElapsed = 0;
+let lockResets = 0;
+let combo = -1;
+let backToBack = false;
+let horizontalKey = null;
+let horizontalHeld = 0;
+let horizontalRepeat = 0;
+let softDropHeld = false;
+let softDropCounter = 0;
 
 let score = 0;
 
@@ -155,6 +169,8 @@ const messageTitle =
 
 const messageText =
     document.getElementById("messageText");
+const holdCanvas = document.getElementById('holdCanvas');
+const holdContext = holdCanvas.getContext('2d');
 
 
 // ==========================================
@@ -162,12 +178,7 @@ const messageText =
 // ==========================================
 
 function createBoard() {
-
-    return Array.from(
-        { length: ROWS },
-        () => Array(COLS).fill(null)
-    );
-
+    return TetrisCore.createBoard();
 }
 
 
@@ -176,31 +187,8 @@ function createBoard() {
 // ==========================================
 
 function randomPiece() {
-
-    const type =
-        TYPES[
-            Math.floor(
-                Math.random() *
-                TYPES.length
-            )
-        ];
-
-
-    return {
-
-        type: type,
-
-        matrix:
-            SHAPES[type].map(
-                row => [...row]
-            ),
-
-        x: 0,
-
-        y: 0
-
-    };
-
+    TetrisCore.ensureQueue(queue,6);
+    return TetrisCore.makePiece(queue.shift());
 }
 
 
@@ -209,34 +197,15 @@ function randomPiece() {
 // ==========================================
 
 function spawnPiece() {
-
-    player = nextPiece || randomPiece();
-
-    nextPiece = randomPiece();
-
-
-    player.x =
-        Math.floor(
-            COLS / 2
-        )
-        -
-        Math.ceil(
-            player.matrix[0].length / 2
-        );
-
-
-    player.y = 0;
-
-
+    player = randomPiece();
+    nextPiece = TetrisCore.makePiece(queue[0]);
+    holdUsed = false;
+    lockElapsed = 0;
+    lockResets = 0;
     drawNextPiece();
-
-
     if (collision()) {
-
         endGame();
-
     }
-
 }
 
 
@@ -249,58 +218,7 @@ function collision(
     offsetX = player.x,
     offsetY = player.y
 ) {
-
-    for (
-        let y = 0;
-        y < matrix.length;
-        y++
-    ) {
-
-        for (
-            let x = 0;
-            x < matrix[y].length;
-            x++
-        ) {
-
-            if (!matrix[y][x]) {
-                continue;
-            }
-
-
-            const newX =
-                x + offsetX;
-
-            const newY =
-                y + offsetY;
-
-
-            if (
-                newX < 0 ||
-                newX >= COLS ||
-                newY >= ROWS
-            ) {
-
-                return true;
-
-            }
-
-
-            if (
-                newY >= 0 &&
-                board[newY][newX]
-            ) {
-
-                return true;
-
-            }
-
-        }
-
-    }
-
-
-    return false;
-
+    return TetrisCore.collides(board,matrix,offsetX,offsetY);
 }
 
 
@@ -309,7 +227,7 @@ function collision(
 // ==========================================
 
 function mergePiece() {
-
+    let lockedAboveVisible = false;
     player.matrix.forEach(
         (row, y) => {
 
@@ -325,12 +243,8 @@ function mergePiece() {
                             player.x + x;
 
 
-                        if (boardY >= 0) {
-
-                            board[boardY][boardX] =
-                                player.type;
-
-                        }
+                        board[boardY][boardX] = player.type;
+                        if (boardY < HIDDEN_ROWS) lockedAboveVisible = true;
 
                     }
 
@@ -339,7 +253,7 @@ function mergePiece() {
 
         }
     );
-
+    return lockedAboveVisible;
 }
 
 
@@ -358,13 +272,12 @@ function movePlayer(direction) {
     }
 
 
-    player.x += direction;
-
-
-    if (collision()) {
-
-        player.x -= direction;
-
+    const grounded = collision(player.matrix,player.x,player.y+1);
+    if (!collision(player.matrix,player.x+direction,player.y)) {
+        player.x += direction;
+        player.lastRotation = false;
+        if (grounded && lockResets < 15) { lockElapsed = 0; lockResets++; }
+        if (!collision(player.matrix,player.x,player.y+1)) lockElapsed = 0;
     }
 
 }
@@ -374,7 +287,7 @@ function movePlayer(direction) {
 // DROP PLAYER
 // ==========================================
 
-function playerDrop() {
+function playerDrop(manual = true) {
     if (window.onlinePlay?.active) { window.onlinePlay.input('down'); return; }
 
     if (
@@ -385,15 +298,11 @@ function playerDrop() {
     }
 
 
-    player.y++;
-
-
-    if (collision()) {
-
-        player.y--;
-
-        lockPiece();
-
+    if (!collision(player.matrix,player.x,player.y+1)) {
+        player.y++;
+        player.lastRotation = false;
+        lockElapsed = 0;
+        if (manual) { score++; updateStats(); }
     }
 
 }
@@ -415,27 +324,8 @@ function hardDrop() {
 
 
     let distance = 0;
-
-
-    while (!collision()) {
-
-        player.y++;
-
-        distance++;
-
-    }
-
-
-    player.y--;
-
-    distance--;
-
-
-    score +=
-        Math.max(
-            distance,
-            0
-        ) * 2;
+    while (!collision(player.matrix,player.x,player.y+1)) { player.y++; distance++; }
+    score += distance*2;
 
 
     lockPiece();
@@ -448,16 +338,19 @@ function hardDrop() {
 // ==========================================
 
 function lockPiece() {
-
+    if (gameOver) return;
     if (!window.tetrisApp || window.tetrisApp.settings.effects) triggerHitEffect();
-    mergePiece();
-    clearLines();
+    const tSpin = TetrisCore.isTSpin(board,player);
+    const lockedAboveVisible = mergePiece();
+    clearLines(tSpin);
     if (window.tetrisApp) {
         window.tetrisApp.cue("lock");
         if (window.tetrisApp.checkGoal()) { updateStats(); return; }
     }
+    if (lockedAboveVisible) { endGame(); updateStats(); return; }
     spawnPiece();
     updateStats();
+    window.tetrisApp?.saveSession?.();
 
 }
 
@@ -479,8 +372,8 @@ function rotateMatrix(matrix) {
 }
 
 
-function rotatePlayer() {
-    if (window.onlinePlay?.active) { window.onlinePlay.input('rotate'); return; }
+function rotatePlayer(clockwise = true) {
+    if (window.onlinePlay?.active) { window.onlinePlay.input(clockwise ? 'rotate' : 'rotateCCW'); return; }
 
     if (
         paused ||
@@ -490,46 +383,29 @@ function rotatePlayer() {
     }
 
 
-    const oldMatrix =
-        player.matrix;
+    const grounded = collision(player.matrix,player.x,player.y+1);
+    const rotated = TetrisCore.rotate(board,player,clockwise);
+    if (!rotated) return;
+    player = rotated;
+    if (grounded && lockResets < 15) { lockElapsed = 0; lockResets++; }
+    if (!collision(player.matrix,player.x,player.y+1)) lockElapsed = 0;
 
-    const oldX =
-        player.x;
+}
 
-
-    player.matrix =
-        rotateMatrix(
-            player.matrix
-        );
-
-
-    const kicks =
-        [0, -1, 1, -2, 2];
-
-
-    for (
-        const offset of kicks
-    ) {
-
-        player.x =
-            oldX + offset;
-
-
-        if (!collision()) {
-
-            return;
-
-        }
-
-    }
-
-
-    player.matrix =
-        oldMatrix;
-
-    player.x =
-        oldX;
-
+function holdPiece() {
+    if (window.onlinePlay?.active) { window.onlinePlay.input('hold'); return; }
+    if (paused || gameOver) return;
+    const previous = heldType;
+    heldType = player.type;
+    if (previous) {
+        player = TetrisCore.makePiece(previous);
+        lockElapsed = 0;
+        lockResets = 0;
+        if (collision()) endGame();
+    } else spawnPiece();
+    holdUsed = true;
+    drawHoldPiece();
+    window.tetrisApp?.saveSession?.();
 }
 
 
@@ -537,112 +413,22 @@ function rotatePlayer() {
 // CLEAR LINES
 // ==========================================
 
-function clearLines() {
-
-    let cleared = 0;
-    const clearedRows = [];
-
-
-    for (
-        let y = ROWS - 1;
-        y >= 0;
-        y--
-    ) {
-
-        const full =
-            board[y].every(
-                cell => cell !== null
-            );
-
-
-        if (full) {
-
-            clearedRows.push(y);
-
-            board.splice(y, 1);
-
-            board.unshift(
-                Array(COLS).fill(null)
-            );
-
-            cleared++;
-
-            y++;
-
-        }
-
-    }
-
-
-    if (cleared === 0) {
-
-        comboMessage.textContent = "";
-
-        return;
-
-    }
-
-    triggerClearEffect(clearedRows);
-
-
+function clearLines(tSpin = false) {
+    const clearedRows = TetrisCore.clearLines(board);
+    const cleared = clearedRows.length;
+    combo = cleared ? combo + 1 : -1;
+    const perfectClear = cleared > 0 && board.every(row => row.every(cell => cell === null));
+    const result = TetrisCore.scoreClear({ count:cleared, level, tSpin, backToBack, combo, perfectClear });
+    score += result.points;
     lines += cleared;
-
-
-    const points = [
-        0,
-        100,
-        300,
-        500,
-        800
-    ];
-
-
-    score +=
-        points[cleared] *
-        level;
-
-
-    if (cleared === 1) {
-
-        showCombo(
-            "GALING!"
-        );
-
-    }
-
-
-    if (cleared === 2) {
-
-        showCombo(
-            "AYOS!"
-        );
-
-    }
-
-
-    if (cleared === 3) {
-
-        showCombo(
-            "ASTIG!"
-        );
-
-    }
-
-
-    if (cleared >= 4) {
-
-        showCombo(
-            "â˜… PINAS COMBO! â˜…"
-        );
-
-    }
-
-
-    level =
-        Math.floor(
-            lines / 10
-        ) + 1;
-
+    if (cleared) {
+        triggerClearEffect(clearedRows.filter(y => y >= HIDDEN_ROWS).map(y => y - HIDDEN_ROWS));
+        const label = tSpin ? 'T-SPIN' : ['', 'GALING!', 'AYOS!', 'ASTIG!', '★ PINAS TETRIS! ★'][cleared];
+        showCombo(perfectClear ? 'PERFECT CLEAR!' : label);
+        backToBack = result.difficult;
+    } else if (tSpin) showCombo('T-SPIN!');
+    else comboMessage.textContent = '';
+    if (window.tetrisApp?.mode !== 'sprint') level = Math.floor(lines / 10) + 1;
 }
 
 
@@ -673,7 +459,9 @@ let authMode = "login";
 const firebaseReady = typeof firebase !== "undefined" && firebase.apps && firebase.apps.length > 0;
 
 if (!firebaseReady) {
-    authMessage.textContent = "Online sign-in is not available yet. Continue as guest to play and save progress on this browser.";
+    document.querySelector('.social-button.google').disabled = true;
+    document.querySelector('.social-button.facebook').disabled = true;
+
 }
 
 function isGmail(email) {
@@ -686,9 +474,14 @@ function setAuthMode(mode) {
 
     showLoginBtn.classList.toggle("active", isLogin);
     showSignupBtn.classList.toggle("active", !isLogin);
-    authSubmit.textContent = isLogin ? "LOG IN" : "SIGN UP";
+    authSubmit.textContent = isLogin ? "LOG IN" : "CREATE ACCOUNT";
+    document.getElementById('authHeading').textContent = isLogin ? 'Welcome back, Player!' : 'Join the Laro!';
+    document.getElementById('authDescription').textContent = isLogin ? 'Sign in and continue your Tetris Pinas journey.' : 'Create your account and start climbing the ranks.';
+    document.getElementById('forgotPassword').classList.toggle('hidden', !isLogin);
+    document.getElementById('authPassword').autocomplete = isLogin ? 'current-password' : 'new-password';
     displayNameField.classList.toggle("hidden", isLogin);
     displayNameInput.required = !isLogin;
+    requestAnimationFrame(fitAuthPanel);
     authMessage.textContent = "";
 }
 
@@ -696,22 +489,58 @@ function showGameScreen() {
     if (window.tetrisApp) window.tetrisApp.enter();
 }
 
+function fitAuthPanel() {
+    const panel = document.querySelector(".auth-panel");
+    if (!panel || authScreen.classList.contains("hidden")) return;
+    const viewport = window.visualViewport;
+    const height = viewport?.height || window.innerHeight;
+    const width = viewport?.width || window.innerWidth;
+    const scale = Math.min(1, Math.max(1, height - 24) / panel.offsetHeight, Math.max(1, width - 24) / panel.offsetWidth);
+    panel.style.setProperty("--auth-fit", String(scale));
+}
+
 function showAuthScreen() {
     gameScreen.classList.add("hidden");
     document.getElementById("hubScreen").classList.add("hidden");
     authScreen.classList.remove("hidden");
+    requestAnimationFrame(fitAuthPanel);
 }
 
-function continueAsGuest() {
-    authMessage.textContent = "Continuing as guest...";
+async function continueAsGuest() {
+    authMessage.textContent = "Starting without an account...";
+    if (window.tetrisServerUser) {
+        try { await fetch('/api/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tetris-Request':'1'},body:'{}'}); } catch { /* File-only play has no server session. */ }
+    }
+    window.tetrisServerUser = null;
     window.tetrisGuestSession = true;
     setTimeout(() => showGameScreen(), 250);
+}
+
+async function serverAuthRequest(path,data) {
+    await fetch('/api/session',{credentials:'same-origin'});
+    const response=await fetch('/api/'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tetris-Request':'1'},body:JSON.stringify(data)});
+    const result=await response.json();
+    if (!response.ok) throw new Error(result.error||'Sign-in failed.');
+    return result;
+}
+async function restoreServerLogin() {
+    if (firebaseReady || window.location?.protocol==='file:') return;
+    try {
+        await fetch('/api/session',{credentials:'same-origin'});
+        const response=await fetch('/api/auth',{credentials:'same-origin'});
+        const result=await response.json();
+        if (result.user) { window.tetrisServerUser=result.user;window.tetrisGuestSession=false; }
+    } catch { /* Login stays available when the server cannot be reached. */ }
 }
 
 window.continueAsGuest = continueAsGuest;
 
 function handleErrorMessage(code) {
     const map = {
+        "auth/operation-not-allowed": "Enable this sign-in method in Firebase Authentication first.",
+        "auth/unauthorized-domain": "Add this website domain in Firebase Authentication settings.",
+        "auth/invalid-credential": "Incorrect email or password.",
+        "auth/network-request-failed": "Could not connect. Check your internet connection and try again.",
         "auth/user-not-found": "No account found. Please sign up first.",
         "auth/wrong-password": "Incorrect password.",
         "auth/email-already-in-use": "This Gmail account already exists. Please log in instead.",
@@ -729,12 +558,22 @@ function handleAuthSubmit(event) {
     event.preventDefault();
 
     if (!firebaseReady) {
-        authMessage.textContent = "Online sign-in is not available yet. Continue as guest to play and save progress on this browser.";
+        if (location.protocol==='file:') { authMessage.textContent='Open the multiplayer server address to log in or sign up.'; return; }
+        const email=authEmailInput.value.trim().toLowerCase(),password=authPasswordInput.value;
+        const name=displayNameInput.value.trim();
+        if (!isGmail(email)||password.length<8) { authMessage.textContent='Use a Gmail address and a password of at least 8 characters.'; return; }
+        if (authMode==='signup'&&!name) { authMessage.textContent='Enter a display name.'; return; }
+        authSubmit.disabled=true;
+        serverAuthRequest(authMode==='signup'?'signup':'login',{email,password,name}).then(result=>{
+            window.tetrisServerUser=result.user;window.tetrisGuestSession=false;
+            authMessage.textContent=`Welcome, ${result.user.name}!`;
+            showGameScreen();
+        }).catch(error=>{authMessage.textContent=error.message;}).finally(()=>{authSubmit.disabled=false;});
         return;
     }
 
     const email = authEmailInput.value.trim().toLowerCase();
-    const password = authPasswordInput.value.trim();
+    const password = authPasswordInput.value;
     const displayName = displayNameInput.value.trim();
 
     if (!email || !password) {
@@ -760,6 +599,8 @@ function handleAuthSubmit(event) {
                 return user.updateProfile({ displayName }).then(() => user);
             })
             .then((user) => {
+                window.tetrisGuestSession = false;
+                window.tetrisServerUser = null;
                 authMessage.textContent = `Account created for ${user.displayName}!`;
                 setTimeout(() => showGameScreen(), 500);
             })
@@ -771,6 +612,8 @@ function handleAuthSubmit(event) {
 
     firebase.auth().signInWithEmailAndPassword(email, password)
         .then(({ user }) => {
+            window.tetrisGuestSession = false;
+            window.tetrisServerUser = null;
             authMessage.textContent = `Welcome back, ${user.displayName || user.email.split("@")[0]}!`;
             setTimeout(() => showGameScreen(), 500);
         })
@@ -781,7 +624,7 @@ function handleAuthSubmit(event) {
 
 function signInWithProvider(provider) {
     if (!firebaseReady) {
-        authMessage.textContent = "Online sign-in is not available yet. Continue as guest to play and save progress on this browser.";
+        authMessage.textContent = "Online sign-in is not available yet. You can play without an account, but progress and history will not be saved.";
         return;
     }
 
@@ -791,6 +634,8 @@ function signInWithProvider(provider) {
 
     firebase.auth().signInWithPopup(authProvider)
         .then(({ user }) => {
+            window.tetrisGuestSession = false;
+            window.tetrisServerUser = null;
             authMessage.textContent = `Signed in with ${provider}.`;
             setTimeout(() => showGameScreen(), 500);
         })
@@ -808,25 +653,19 @@ document.querySelector(".social-button.google").addEventListener("click", () => 
 document.querySelector(".social-button.facebook").addEventListener("click", () => signInWithProvider("facebook"));
 
 function startAppIntro() {
-    if (!introScreen) {
-        setAuthMode("login");
-        showAuthScreen();
-        return;
+    // Restore any existing account while the static logo is on screen.
+    restoreServerLogin();
+    function openDashboard() {
+        authScreen.classList.add('hidden');
+        showGameScreen();
+        if (introScreen) introScreen.classList.add('hidden');
     }
-
-    introScreen.classList.remove("hidden");
-    authScreen.classList.add("hidden");
-    gameScreen.classList.add("hidden");
-
-    setTimeout(() => {
-        introScreen.classList.add("fade-out");
-
-        setTimeout(() => {
-            introScreen.classList.add("hidden");
-            setAuthMode("login");
-            showAuthScreen();
-        }, 1250);
-    }, 1500);
+    if (!introScreen) { openDashboard(); return; }
+    introScreen.classList.remove('hidden');
+    authScreen.classList.add('hidden');
+    gameScreen.classList.add('hidden');
+    document.getElementById('hubScreen').classList.add('hidden');
+    setTimeout(openDashboard, 3000);
 }
 
 startAppIntro();
@@ -1077,6 +916,8 @@ function drawBackground() {
     }
 
 
+    if (window.tetrisApp?.settings?.grid === false) return;
+
     context.strokeStyle =
         "rgba(255,255,255,0.12)";
 
@@ -1144,12 +985,12 @@ function drawBoard() {
             row.forEach(
                 (type, x) => {
 
-                    if (type) {
+                    if (type && y >= HIDDEN_ROWS) {
 
                         drawBlock(
                             context,
                             x,
-                            y,
+                            y - HIDDEN_ROWS,
                             COLORS[type],
                             BLOCK,
                             {
@@ -1186,12 +1027,12 @@ function drawPlayer() {
             row.forEach(
                 (value, x) => {
 
-                    if (value) {
+                    if (value && player.y + y >= HIDDEN_ROWS) {
 
                         drawBlock(
                             context,
                             player.x + x,
-                            player.y + y,
+                            player.y + y - HIDDEN_ROWS,
                             COLORS[player.type],
                             BLOCK,
                             {
@@ -1216,184 +1057,60 @@ function drawPlayer() {
 // ==========================================
 
 function drawGhost() {
-
-    if (!player) {
-        return;
-    }
-
-
-    let ghostY =
-        player.y;
-
-
-    while (
-        !collision(
-            player.matrix,
-            player.x,
-            ghostY + 1
-        )
-    ) {
-
-        ghostY++;
-
-    }
-
+    if (!player) return;
+    let ghostY = player.y;
+    while (!collision(player.matrix, player.x, ghostY + 1)) ghostY++;
+    if (ghostY === player.y) return;
 
     context.save();
-
-
-    context.globalAlpha =
-        0.22;
-
-
-    player.matrix.forEach(
-        (row, y) => {
-
-            row.forEach(
-                (value, x) => {
-
-                    if (value) {
-
-                        drawBlock(
-                            context,
-                            player.x + x,
-                            ghostY + y,
-                            COLORS[player.type],
-                            BLOCK,
-                            {
-                                glow: true,
-                                glowStrength: 10
-                            }
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-    );
-
-
+    context.globalAlpha = 0.85;
+    context.strokeStyle = COLORS[player.type];
+    context.lineWidth = 2;
+    context.shadowColor = COLORS[player.type];
+    context.shadowBlur = 3;
+    player.matrix.forEach((row, y) => row.forEach((value, x) => {
+        if (!value || ghostY + y < HIDDEN_ROWS) return;
+        const px = (player.x + x) * BLOCK;
+        const py = (ghostY + y - HIDDEN_ROWS) * BLOCK;
+        context.strokeRect(px + 2, py + 2, BLOCK - 4, BLOCK - 4);
+    }));
     context.restore();
-
 }
 
 
-// ==========================================
-// DRAW NEXT PIECE
-// ==========================================
-
+function drawPreviewPiece(ctx,type,top,height) {
+    if (!type) return;
+    const matrix = SHAPES[type];
+    const canvasWidth = ctx === holdContext ? holdCanvas.width : nextCanvas.width;
+    const size = Math.min(23,Math.floor((canvasWidth - 14)/matrix[0].length),Math.floor((height - 8)/matrix.length));
+    const left = Math.floor((canvasWidth - matrix[0].length*size)/2);
+    const offsetY = top + Math.floor((height - matrix.length*size)/2);
+    ctx.save();
+    ctx.translate(left,offsetY);
+    matrix.forEach((row,y) => row.forEach((value,x) => {
+        if (!value) return;
+        drawBlock(ctx,x,y,COLORS[type],size);
+    }));
+    ctx.restore();
+}
 function drawNextPiece() {
-
-    nextContext.clearRect(
-        0,
-        0,
-        nextCanvas.width,
-        nextCanvas.height
-    );
-
-
-    nextContext.fillStyle =
-        "#211711";
-
-
-    nextContext.fillRect(
-        0,
-        0,
-        nextCanvas.width,
-        nextCanvas.height
-    );
-
-
-    if (!nextPiece) {
-        return;
-    }
-
-
-    const matrix =
-        nextPiece.matrix;
-
-
-    const size = 25;
-
-
-    const width =
-        matrix[0].length *
-        size;
-
-
-    const height =
-        matrix.length *
-        size;
-
-
-    const startX =
-        (
-            nextCanvas.width -
-            width
-        ) / 2;
-
-
-    const startY =
-        (
-            nextCanvas.height -
-            height
-        ) / 2;
-
-
-    matrix.forEach(
-        (row, y) => {
-
-            row.forEach(
-                (value, x) => {
-
-                    if (!value) {
-                        return;
-                    }
-
-
-                    const px =
-                        startX +
-                        x * size;
-
-
-                    const py =
-                        startY +
-                        y * size;
-
-
-                    nextContext.fillStyle =
-                        COLORS[
-                            nextPiece.type
-                        ];
-
-
-                    nextContext.fillRect(
-                        px + 1,
-                        py + 1,
-                        size - 2,
-                        size - 2
-                    );
-
-
-                    nextContext.strokeStyle =
-                        "rgba(255,255,255,0.25)";
-
-
-                    nextContext.strokeRect(
-                        px + 4,
-                        py + 4,
-                        size - 8,
-                        size - 8
-                    );
-
-                }
-            );
-
+    nextContext.clearRect(0,0,nextCanvas.width,nextCanvas.height);
+    nextContext.fillStyle='rgba(18,9,3,.68)';
+    nextContext.fillRect(0,0,nextCanvas.width,nextCanvas.height);
+    queue.slice(0,5).forEach((type,index) => {
+        if (index) {
+            nextContext.fillStyle='rgba(255,255,255,.1)';
+            nextContext.fillRect(12,index*80, nextCanvas.width-24,1);
         }
-    );
-
+        drawPreviewPiece(nextContext,type,index*80,80);
+    });
+}
+function drawHoldPiece() {
+    document.getElementById('holdStatus').textContent = heldType ? '(SWAP)' : '';
+    holdContext.clearRect(0,0,holdCanvas.width,holdCanvas.height);
+    holdContext.fillStyle='rgba(18,9,3,.68)';
+    holdContext.fillRect(0,0,holdCanvas.width,holdCanvas.height);
+    drawPreviewPiece(holdContext,heldType,0,holdCanvas.height);
 }
 
 
@@ -1440,7 +1157,7 @@ function draw() {
 
     drawBoard();
 
-    if (!window.tetrisApp || window.tetrisApp.settings.ghost) drawGhost();
+    if (!window.tetrisApp || window.tetrisApp.settings.ghost || (window.tetrisApp.mode==='practice' && window.tetrisApp.settings.practiceHints)) drawGhost();
 
     drawPlayer();
     if (!window.tetrisApp || window.tetrisApp.settings.effects) drawEffects();
@@ -1462,6 +1179,7 @@ function updateStats() {
 
     levelElement.textContent =
         level;
+    window.tetrisApp?.updateModeInfo?.();
 
 }
 
@@ -1471,15 +1189,11 @@ function updateStats() {
 // ==========================================
 
 function getDropInterval() {
-
-    return Math.max(
-        100,
-        850 -
-        (
-            level - 1
-        ) * 70
-    );
-
+    const mode = window.tetrisApp?.mode;
+    const settings = window.tetrisApp?.settings;
+    if (mode === 'sprint') return TetrisCore.getGravityMs(1);
+    if (mode === 'practice') return settings?.practiceGravity ? Number(settings.practiceSpeed || 1000) : Infinity;
+    return TetrisCore.getGravityMs(level);
 }
 
 
@@ -1489,7 +1203,7 @@ function getDropInterval() {
 
 function update(time = 0) {
 
-    const deltaTime = Math.min(250, Math.max(0, time - lastTime));
+    const deltaTime = Math.max(0, time - lastTime);
 
 
     lastTime = time;
@@ -1514,25 +1228,50 @@ function update(time = 0) {
     ) {
 
         if (window.tetrisApp) window.tetrisApp.tick(deltaTime);
-        dropCounter += deltaTime;
-
-
-        if (
-            dropCounter >
-            getDropInterval() && !gameOver &&
-            (!window.tetrisApp || window.tetrisApp.mode !== "practice")
-        ) {
-
-            playerDrop();
-
-            dropCounter = 0;
-
+        if (!gameOver) {
+            const settings = window.tetrisApp?.settings || {};
+            if (horizontalKey) {
+                const before = horizontalHeld;
+                horizontalHeld += deltaTime;
+                if (horizontalHeld >= Number(settings.das || 150)) {
+                    horizontalRepeat += horizontalHeld - Math.max(before,Number(settings.das || 150));
+                    const arr = Math.max(10,Number(settings.arr || 30));
+                    while (horizontalRepeat >= arr) {
+                        movePlayer(horizontalKey === 'ArrowLeft' ? -1 : 1);
+                        horizontalRepeat -= arr;
+                    }
+                }
+            }
+            if (softDropHeld) {
+                softDropCounter += deltaTime;
+                const softInterval = Math.min(getDropInterval()/Math.max(1,Number(settings.softDropFactor || 20)),50);
+                while (softDropCounter >= softInterval && !gameOver && !collision(player.matrix,player.x,player.y+1)) {
+                    playerDrop(true);
+                    softDropCounter -= softInterval;
+                }
+                softDropCounter = Math.min(softDropCounter,softInterval);
+            }
+            const interval = getDropInterval();
+            if (Number.isFinite(interval)) {
+                dropCounter += deltaTime;
+                let steps = 0;
+                while (dropCounter >= interval && !gameOver && steps++ < 1000) {
+                    dropCounter -= interval;
+                    if (collision(player.matrix,player.x,player.y+1)) { dropCounter = 0; break; }
+                    playerDrop(false);
+                }
+            }
+            if (collision(player.matrix,player.x,player.y+1)) {
+                lockElapsed += deltaTime;
+                if (lockElapsed >= 500) lockPiece();
+            } else lockElapsed = 0;
         }
 
     }
 
 
     if (window.onlinePlay?.active) window.onlinePlay.tick();
+    syncMouseTarget();
     draw();
 
 
@@ -1560,6 +1299,9 @@ function togglePause() {
 
 
     if (paused) {
+        horizontalKey = null;
+        softDropHeld = false;
+        window.tetrisApp?.saveSession?.();
 
         messageTitle.textContent =
             "PAUSED";
@@ -1639,6 +1381,18 @@ function resetGame() {
 
     board =
         createBoard();
+    queue = [];
+    heldType = null;
+    holdUsed = false;
+    lockElapsed = 0;
+    lockResets = 0;
+    combo = -1;
+    backToBack = false;
+    horizontalKey = null;
+    horizontalHeld = 0;
+    horizontalRepeat = 0;
+    softDropHeld = false;
+    softDropCounter = 0;
 
 
     score = 0;
@@ -1653,11 +1407,8 @@ function resetGame() {
     gameOver = false;
 
 
-    nextPiece =
-        randomPiece();
-
-
     spawnPiece();
+    drawHoldPiece();
 
 
     updateStats();
@@ -1685,81 +1436,79 @@ function resetGame() {
 
 }
 
+window.tetrisSession = {
+    snapshot() {
+        return {version:1,board:board.map(row=>row.slice()),player:{...player,matrix:player.matrix.map(row=>row.slice())},queue:queue.slice(),heldType,holdUsed,score,lines,level,dropCounter,lockElapsed,lockResets,combo,backToBack};
+    },
+    restore(state) {
+        if (!state || state.version!==1 || !Array.isArray(state.board) || state.board.length!==BOARD_ROWS || !state.board.every(row=>Array.isArray(row)&&row.length===COLS&&row.every(cell=>cell===null||!!SHAPES[cell])) || !state.player || !SHAPES[state.player.type] || !Array.isArray(state.queue) || !Number.isInteger(state.player.x) || !Number.isInteger(state.player.y)) return false;
+        const matrix=state.player.matrix;
+        if (!Array.isArray(matrix)||matrix.length!==SHAPES[state.player.type].length||!matrix.every(row=>Array.isArray(row)&&row.length===matrix.length&&row.every(cell=>cell===0||cell===1))||matrix.flat().filter(Boolean).length!==4) return false;
+        const candidateBoard=state.board.map(row=>row.slice());
+        const candidatePlayer={...state.player,matrix:matrix.map(row=>row.slice())};
+        if (TetrisCore.collides(candidateBoard,candidatePlayer.matrix,candidatePlayer.x,candidatePlayer.y)) return false;
+        board=candidateBoard;
+        player=candidatePlayer;
+        queue=state.queue.filter(type=>SHAPES[type]).slice(0,50);
+        TetrisCore.ensureQueue(queue,5);
+        nextPiece=TetrisCore.makePiece(queue[0]);
+        heldType=SHAPES[state.heldType]?state.heldType:null;
+        holdUsed=!!state.holdUsed;
+        score=Number(state.score)||0;
+        lines=Number(state.lines)||0;
+        level=Number(state.level)||1;
+        dropCounter=Number(state.dropCounter)||0;
+        lockElapsed=Number(state.lockElapsed)||0;
+        lockResets=Number(state.lockResets)||0;
+        combo=Number(state.combo ?? -1);
+        backToBack=!!state.backToBack;
+        paused=true;gameOver=false;
+        drawNextPiece();drawHoldPiece();updateStats();
+        return true;
+    }
+};
+
 
 // ==========================================
 // KEYBOARD CONTROLS
 // ==========================================
 
-document.addEventListener(
-    "keydown",
-    event => {
-        if (event.target.matches('input, textarea, select, [contenteditable="true"]') || gameScreen.classList.contains('hidden') || document.getElementById('matchMenu').open) return;
-
-        if (
-            event.code === "ArrowLeft"
-        ) {
-
-            event.preventDefault();
-
-            movePlayer(-1);
-
-        }
-
-
-        else if (
-            event.code === "ArrowRight"
-        ) {
-
-            event.preventDefault();
-
-            movePlayer(1);
-
-        }
-
-
-        else if (
-            event.code === "ArrowDown"
-        ) {
-
-            event.preventDefault();
-
-            playerDrop();
-
-        }
-
-
-        else if (
-            event.code === "ArrowUp"
-        ) {
-
-            event.preventDefault();
-
-            rotatePlayer();
-
-        }
-
-
-        else if (
-            event.code === "Space"
-        ) {
-
-            event.preventDefault();
-
-            hardDrop();
-
-        }
-
-
-        else if (
-            event.key.toLowerCase() === "p"
-        ) {
-
-            togglePause();
-
-        }
-
-    }
-);
+document.addEventListener('keydown', event => {
+    if (event.target.matches('input, textarea, select, [contenteditable="true"]') || gameScreen.classList.contains('hidden') || document.getElementById('matchMenu').open) return;
+    const controls=window.tetrisApp?.settings?.controls || {};
+    const action=Object.entries({
+        left:'ArrowLeft',right:'ArrowRight',softDrop:'ArrowDown',hardDrop:'Space',
+        rotateCW:'ArrowUp',rotateCCW:'KeyZ',hold:'KeyC'
+    }).find(([name,defaultCode]) => (controls[name]||defaultCode)===event.code)?.[0];
+    const key=action || ({KeyX:'rotateCW',ShiftLeft:'hold',ShiftRight:'hold',KeyP:'pause',KeyR:'restart'}[event.code]);
+    if (!key) return;
+    event.preventDefault();
+    mouseColumn = null;
+    window.onlinePlay?.point?.(null);
+    if (key==='left' || key==='right') {
+        if (event.repeat || horizontalKey===event.code) return;
+        horizontalKey=event.code;
+        horizontalHeld=0;horizontalRepeat=0;
+        movePlayer(key==='left'?-1:1);
+    } else if (key==='softDrop') {
+        if (!event.repeat) { softDropHeld=true;softDropCounter=0;playerDrop(true); }
+    } else if (event.repeat) return;
+    else if (key==='hardDrop') hardDrop();
+    else if (key==='rotateCW') rotatePlayer(true);
+    else if (key==='rotateCCW') rotatePlayer(false);
+    else if (key==='hold') holdPiece();
+    else if (key==='pause') togglePause();
+    else if (key==='restart') confirmRestart();
+});
+document.addEventListener('keyup', event => {
+    if (event.code===horizontalKey) {horizontalKey=null;horizontalHeld=0;horizontalRepeat=0;}
+    if (event.code===(window.tetrisApp?.settings?.controls?.softDrop||'ArrowDown')) {softDropHeld=false;softDropCounter=0;}
+});
+function confirmRestart() {
+    if (window.onlinePlay?.active) { window.onlinePlay.noRestart(); return; }
+    if (typeof window.confirm==='function' && !window.confirm('Restart this game? Your current run will end.')) return;
+    resetGame();
+}
 
 
 // ==========================================
@@ -1769,6 +1518,7 @@ document.addEventListener(
 // Board gestures replace the hidden button panel.
 const gestureBoard = canvas.closest('.board-frame');
 let boardGesture = null;
+let mouseColumn = null;
 let boardHoldTimer;
 function cancelBoardGesture() {
     clearTimeout(boardHoldTimer);
@@ -1776,7 +1526,8 @@ function cancelBoardGesture() {
 }
 gestureBoard.addEventListener('pointerdown', event => {
     if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
-    boardGesture = { id: event.pointerId, x: event.clientX, y: event.clientY, held: false };
+    followMouse(event);
+    boardGesture = { pointerType:event.pointerType, id: event.pointerId, x: event.clientX, y: event.clientY, held: false };
     gestureBoard.setPointerCapture(event.pointerId);
     if (!paused && !gameOver) {
         boardHoldTimer = setTimeout(() => {
@@ -1786,7 +1537,26 @@ gestureBoard.addEventListener('pointerdown', event => {
         }, 600);
     }
 });
+function followMouse(event) {
+    if (event.pointerType !== 'mouse' || !player || gameScreen.classList.contains('hidden') || paused || gameOver || document.getElementById('matchMenu').open) return;
+    const rect = canvas.getBoundingClientRect();
+    mouseColumn = Math.max(0, Math.min(COLS - 1, Math.floor((event.clientX - rect.left) / (rect.width / COLS))));
+    syncMouseTarget();
+}
+function syncMouseTarget() {
+    if (mouseColumn === null || !player || gameScreen.classList.contains('hidden') || paused || gameOver || document.getElementById('matchMenu').open) return;
+    if (window.onlinePlay?.active) { window.onlinePlay.point(mouseColumn); return; }
+    const occupied = player.matrix.flatMap(row => row.flatMap((v, x) => v ? [x] : []));
+    const target = mouseColumn - Math.min(...occupied);
+    for (let step = 0; step < COLS && player.x !== target; step++) {
+        const direction = Math.sign(target - player.x);
+        if (collision(player.matrix, player.x + direction, player.y)) break;
+        movePlayer(direction);
+    }
+}
+gestureBoard.addEventListener('pointerleave', () => { mouseColumn = null; window.onlinePlay?.point?.(null); });
 gestureBoard.addEventListener('pointermove', event => {
+    followMouse(event);
     if (!boardGesture || boardGesture.id !== event.pointerId) return;
     if (Math.hypot(event.clientX - boardGesture.x, event.clientY - boardGesture.y) > 12) {
         clearTimeout(boardHoldTimer);
@@ -1802,7 +1572,12 @@ gestureBoard.addEventListener('pointerup', event => {
     const distance = Math.hypot(dx, dy);
     if (gameOver) { if (distance < 18) resetGame(); return; }
     if (paused) { if (distance < 18) togglePause(); return; }
-    if (distance < 18) { rotatePlayer(); return; }
+    if (distance < 18) {
+        if (gesture.pointerType === "mouse") hardDrop();
+        else rotatePlayer();
+        return;
+    }
+    if (gesture.pointerType === "mouse") return;
     if (Math.abs(dx) > Math.abs(dy)) {
         const cellWidth = canvas.getBoundingClientRect().width / COLS;
         const steps = Math.min(COLS, Math.max(1, Math.round(Math.abs(dx) / cellWidth)));
@@ -1816,65 +1591,16 @@ gestureBoard.addEventListener('pointerup', event => {
 });
 gestureBoard.addEventListener('pointercancel', cancelBoardGesture);
 gestureBoard.addEventListener('lostpointercapture', cancelBoardGesture);
-gestureBoard.addEventListener('contextmenu', event => event.preventDefault());
-document.addEventListener('keydown', event => {
-    if (gameScreen.classList.contains('hidden') || document.getElementById('matchMenu').open || event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
-    if (event.key.toLowerCase() === 'r' && !event.repeat) resetGame();
+gestureBoard.addEventListener('wheel', event => {
+    if (gameScreen.classList.contains('hidden') || document.getElementById('matchMenu').open || paused || gameOver || !event.deltaY) return;
+    event.preventDefault();
+    rotatePlayer(event.deltaY > 0);
+    syncMouseTarget();
+}, { passive:false });
+gestureBoard.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    if (!gameScreen.classList.contains('hidden') && !document.getElementById('matchMenu').open && !paused && !gameOver) rotatePlayer();
 });
-
-// // BUTTON CONTROLS
-// ==========================================
-
-document
-    .getElementById(
-        "leftButton"
-    )
-    .addEventListener(
-        "click",
-        () => movePlayer(-1)
-    );
-
-
-document
-    .getElementById(
-        "rightButton"
-    )
-    .addEventListener(
-        "click",
-        () => movePlayer(1)
-    );
-
-
-document
-    .getElementById(
-        "downButton"
-    )
-    .addEventListener(
-        "click",
-        playerDrop
-    );
-
-
-document
-    .getElementById(
-        "rotateButton"
-    )
-    .addEventListener(
-        "click",
-        rotatePlayer
-    );
-
-
-document
-    .getElementById(
-        "dropButton"
-    )
-    .addEventListener(
-        "click",
-        hardDrop
-    );
-
-
 document
     .getElementById(
         "pauseButton"
@@ -1885,14 +1611,7 @@ document
     );
 
 
-document
-    .getElementById(
-        "restartButton"
-    )
-    .addEventListener(
-        "click",
-        resetGame
-    );
+
 
 
 // ==========================================
@@ -1903,3 +1622,32 @@ resetGame();
 update();
 
 
+
+// Shared login/signup panel controls.
+document.getElementById('toggleAuthPassword').addEventListener('click', () => {
+    const input = document.getElementById('authPassword');
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    document.getElementById('toggleAuthPassword').setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    document.getElementById('toggleAuthPassword').setAttribute('aria-pressed', String(show));
+});
+document.getElementById('forgotPassword').addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value.trim();
+    if (!firebaseReady || window.tetrisServerUser) { authMessage.textContent = 'Password recovery is not available yet.'; return; }
+    if (!email) { authMessage.textContent = 'Enter your email address first.'; return; }
+    try { await firebase.auth().sendPasswordResetEmail(email); authMessage.textContent = 'If an account exists for this email, you will receive a reset link.'; }
+    catch { authMessage.textContent = 'Could not request a reset link. Please try again.'; }
+});
+
+window.addEventListener?.('resize', fitAuthPanel);
+window.visualViewport?.addEventListener('resize', fitAuthPanel);
+if (typeof ResizeObserver !== 'undefined') {
+    const authPanelObserver = new ResizeObserver(fitAuthPanel);
+    authPanelObserver.observe(document.querySelector('.auth-panel'));
+}
+
+// Restore Firebase identity if it arrives after the three-second intro.
+if (firebaseReady) firebase.auth().onAuthStateChanged(user => {
+    if (!user || window.tetrisGuestSession || !introScreen.classList.contains('hidden') || !authScreen.classList.contains('hidden') || !gameScreen.classList.contains('hidden')) return;
+    window.tetrisApp?.enter();
+});
