@@ -7,3 +7,8 @@
 qa-*
 *-test.cjs
 node_modules
+
+# Never bundle local browser profiles or account data
+tmp
+.tetris-accounts.json
+.tetris-accounts.json.tmp

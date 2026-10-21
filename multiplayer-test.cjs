@@ -37,6 +37,21 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    assert(response.headers.get('content-type').startsWith('text/css'),'Stylesheet MIME type: '+match[1]);
    assert((await response.text()).length>0,'Stylesheet must contain styles: '+match[1]);
   }
+﻿  // Verify every local HTML, CSS, and script asset is deployable.
+  const assetReferences=new Set();
+  for(const file of fs.readdirSync(__dirname).filter(name=>/\.(html|css|js)$/.test(name))) {
+   const source=fs.readFileSync(path.join(__dirname,file),'utf8');
+   for(const match of source.matchAll(/(?:src|href)=["']([^"']+)["']|url\(\s*["']?([^\s)'";]+)|["'`](Assets\/[^"'`]+)["'`]/g)) {
+    const asset=(match[1]||match[2]||match[3]).split(/[?#]/)[0];
+    if(asset&&!/^(https?:|data:|#|\/\/)/.test(asset))assetReferences.add(asset);
+   }
+  }
+  for(const asset of assetReferences) {
+   assert(fs.existsSync(path.join(__dirname,asset)),'Referenced asset exists: '+asset);
+   const response=await fetch(base+'/'+asset);assert.equal(response.status,200,'Referenced asset is served: '+asset);
+   await response.arrayBuffer();
+  }
+
   const a=await client('Ana'),b=await client('Ben'),outsider=await client('Other');
   const signup=await a.post('signup',{email:'ana@gmail.com',password:'secure-pass-123',name:'Ana'});assert.equal(signup.status,200);assert(signup.body.user.id);assert(!JSON.stringify(signup.body).includes('passwordHash'));
   assert.equal((await a.post('logout')).status,200);

@@ -7,7 +7,7 @@ const engine=require('./multiplayer-engine.cjs');
 function createMultiplayerServer(options={}) {
  const sessions=new Map(),players=new Map(),rooms=new Map(),ipLimits=new Map();
  const root=__dirname;
- const accountFile=options.accountFile||path.join(root,'.tetris-accounts.json');
+ const accountFile=options.accountFile||process.env.ACCOUNT_FILE||path.join(root,'.tetris-accounts.json');
  let accounts={};
  try { accounts=JSON.parse(fs.readFileSync(accountFile,'utf8')); } catch { accounts={}; }
  const saveAccounts=()=>{const temporary=accountFile+'.tmp';fs.writeFileSync(temporary,JSON.stringify(accounts),{mode:0o600});fs.renameSync(temporary,accountFile);};
@@ -15,7 +15,7 @@ function createMultiplayerServer(options={}) {
  const allowedFiles=new Set(['index.html','style.css','app.css','dashboard.css','glass.css','mechanics.css','amber-glass.css','how-to-play.css','settings.css','tetris-core.js','app.js','game.js','online.js','friends.js','background.jfif','board-background.jfif','bg-fiesta.svg']);
  for(const name of ['logo','logo-original','sidebar-art','sidebar-full-v2','sunset','online','marathon','sprint','blitz','practice','trophy','controller','blocks','avatar']) allowedFiles.add(`Assets/dashboard/${name}.png`);
  for(const name of ['play','online','guide','settings','trophy','edit','star','gamepad','clock']) allowedFiles.add(`Assets/dashboard/icons/${name}.png`);
- for(const name of ['marathon','sprint','blitz','practice']) allowedFiles.add(`Assets/dashboard/${name}-extended.png`);
+ for(const name of ['marathon','sprint','blitz','practice']) { allowedFiles.add(`Assets/dashboard/${name}-extended.png`); allowedFiles.add(`Assets/dashboard/${name}-ornamental.png`); }
  for (const file of ['festival-game.css','Assets/game/sun-panel-background.png','Assets/game/frame-ornament.svg','Assets/game/board-sun.svg','Assets/game/festival-background.png']) allowedFiles.add(file);
  allowedFiles.add('Assets/dashboard/rank-trophies.png');
  allowedFiles.add('Assets/dashboard/rank-trophies-transparent.png');

@@ -15,12 +15,12 @@ Optional Google and Facebook buttons appear only after valid Firebase settings h
 - Marathon: clear lines, gain a level every 10 lines, and try to beat your best score. Unfinished runs save automatically and can be resumed.
 - 40-line Sprint: clear 40 lines as fast as possible. The best successful time, to the millisecond, determines your rank.
 - Blitz: score as many points as possible in 120 seconds of active play.
-- Practice: position pieces without automatic gravity by default. Optional gravity, grid, ghost, and placement hints can be set under Settings.
+- Practice: position pieces without automatic gravity by default. Optional gravity, fall interval, grid, and ghost can be set under Settings.
 - Online: create a room, join by code or link, or find a real opponent. Both players receive the same 7-bag sequence and race on separate boards. The server determines results.
 
 All modes use the shared 10-column, 20-visible-row rules with two hidden spawn rows, SRS kicks, Hold, five Next pieces, 500 ms lock delay, combos, T-Spins, Back-to-Back bonuses, Perfect Clears, and the same scoring rules. The online race runs the shared rules on the server, so clients cannot submit their own score or win result.
 
-Keyboard: Left/Right move, Down soft drops, Space hard drops, Up or X rotates clockwise, Z rotates counterclockwise, C or Shift holds, P pauses, Esc opens the menu, and R restarts after confirmation. Hold a direction for DAS/ARR movement. Settings offers alternate key bindings and timing controls. On touchscreens, tap to rotate, swipe to move or drop, swipe up to hard drop, and hold the board to pause. Optional touch buttons include Hold.
+Keyboard: Left/Right move, Down soft drops, Space hard drops, Up or X rotates clockwise, Z rotates counterclockwise, C or Shift holds, P pauses, Esc opens the menu, and R restarts after confirmation. Hold a direction for DAS/ARR movement. Settings offers alternate key bindings and timing controls. On touchscreens, tap to rotate, swipe to move or drop, swipe up to hard drop, and hold the board to pause. Use C or Shift on a keyboard to hold a piece.
 
 The combined Favorites/Online panel displays real server presence and locally saved favorites. The View all link opens the full list in the Online section. A green dot marks players currently online.
 
@@ -33,3 +33,15 @@ Rooms and live sessions are kept in server memory, so restarting the server ends
 ## Verify
 
 Run `node tetris-core-test.cjs`, `node flow-smoke-test.cjs`, and `node multiplayer-test.cjs`. `npm test` runs the same suite where npm scripts are enabled. The tests cover the board, bag, gravity, SRS collision, scoring, Hold, lock delay, solo mode flow, account endpoints, and real HTTP multiplayer rooms.
+
+## Current design and settings
+
+The page loads all nine stylesheets in index.html, including how-to-play.css and settings.css. The Node server explicitly allows these files and the referenced artwork. Settings apply and save immediately: ghost, grid, visual effects, sound effects, separate music/effects volumes, supported-device vibration, Practice gravity/speed, keyboard bindings, and solo keyboard movement speed. Appearance selection and duplicate Practice hints were removed.
+
+## Render deployment
+
+Create a Node Web Service from this repository, use npm install as the build command and node server.cjs as the start command, and select the main branch. Set NODE_ENV=production and PUBLIC_ORIGIN to the exact HTTPS service URL. Deploy the latest commit after pushing changes; check the commit hash in Render if the site looks outdated.
+
+Use one server instance: multiplayer rooms and sessions live in memory and reset on restarts. For durable accounts, attach a persistent disk and set ACCOUNT_FILE to a file on its mount, for example /var/data/accounts.json. Its parent directory must exist and be writable. Without a persistent disk, account changes can be lost on restarts or redeployments. The Docker image includes all current runtime files and defaults to /app/data/accounts.json; mount persistent storage at /app/data.
+
+The tmp/ directory contains local previews and browser test profiles. It is not part of the game and must not be committed or included in deployment images.

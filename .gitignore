@@ -1,3 +1,6 @@
 .tetris-accounts.json
 .tetris-accounts.json.tmp
 node_modules/
+
+# Local previews, recordings, and browser test profiles
+tmp/
