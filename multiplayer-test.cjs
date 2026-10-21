@@ -30,6 +30,13 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   await c.wait(m=>m.self.id===c.id);assert.equal((await c.post('profile',{name})).status,200);return c;
  }
  try{
+  const page=await fetch(base+'/');assert.equal(page.status,200);
+  const html=await page.text();
+  for(const match of html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)) {
+   const response=await fetch(base+'/'+match[1]);assert.equal(response.status,200,'Linked stylesheet must be served: '+match[1]);
+   assert(response.headers.get('content-type').startsWith('text/css'),'Stylesheet MIME type: '+match[1]);
+   assert((await response.text()).length>0,'Stylesheet must contain styles: '+match[1]);
+  }
   const a=await client('Ana'),b=await client('Ben'),outsider=await client('Other');
   const signup=await a.post('signup',{email:'ana@gmail.com',password:'secure-pass-123',name:'Ana'});assert.equal(signup.status,200);assert(signup.body.user.id);assert(!JSON.stringify(signup.body).includes('passwordHash'));
   assert.equal((await a.post('logout')).status,200);

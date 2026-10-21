@@ -12,7 +12,7 @@ function createMultiplayerServer(options={}) {
  try { accounts=JSON.parse(fs.readFileSync(accountFile,'utf8')); } catch { accounts={}; }
  const saveAccounts=()=>{const temporary=accountFile+'.tmp';fs.writeFileSync(temporary,JSON.stringify(accounts),{mode:0o600});fs.renameSync(temporary,accountFile);};
  const passwordHash=(password,salt)=>crypto.scryptSync(password,salt,64).toString('hex');
- const allowedFiles=new Set(['index.html','style.css','app.css','dashboard.css','glass.css','mechanics.css','amber-glass.css','tetris-core.js','app.js','game.js','online.js','friends.js','background.jfif','board-background.jfif','bg-fiesta.svg']);
+ const allowedFiles=new Set(['index.html','style.css','app.css','dashboard.css','glass.css','mechanics.css','amber-glass.css','how-to-play.css','settings.css','tetris-core.js','app.js','game.js','online.js','friends.js','background.jfif','board-background.jfif','bg-fiesta.svg']);
  for(const name of ['logo','logo-original','sidebar-art','sidebar-full-v2','sunset','online','marathon','sprint','blitz','practice','trophy','controller','blocks','avatar']) allowedFiles.add(`Assets/dashboard/${name}.png`);
  for(const name of ['play','online','guide','settings','trophy','edit','star','gamepad','clock']) allowedFiles.add(`Assets/dashboard/icons/${name}.png`);
  for(const name of ['marathon','sprint','blitz','practice']) allowedFiles.add(`Assets/dashboard/${name}-extended.png`);
