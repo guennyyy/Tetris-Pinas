@@ -9,6 +9,7 @@
     let self;
     let room;
     let startedRoom;
+    let audioState = null;
     let offset = 0;
     let actions = Promise.resolve();
     let pendingActions = 0;
@@ -36,6 +37,13 @@
     }
     function applyState(state) {
         if (!state) return;
+        const nextAudioState = { board:JSON.stringify(state.board), lines:state.lines };
+        if (audioState && !document.hidden && !gameScreen.classList.contains('hidden')) {
+            const cleared = Math.max(0, state.lines - audioState.lines);
+            if (cleared || nextAudioState.board !== audioState.board) window.tetrisApp.cue('lock');
+            if (cleared) window.tetrisApp.cue('clear', Math.min(4, cleared));
+        }
+        audioState = nextAudioState;
         const retarget = player && (state.player.type !== player.type || state.player.y < player.y || state.player.rotation !== player.rotation);
         if (retarget && pointerColumn !== null) {
             const column=pointerColumn;pointerColumn=null;
@@ -84,6 +92,7 @@
         if (room.status === 'waiting') return;
         if (startedRoom !== room.code && !handled.has(room.code)) {
             active = false;
+            audioState = null;
             window.tetrisApp.start('versus');
             startedRoom = room.code;
         }

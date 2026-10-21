@@ -79,7 +79,7 @@ app.go('leaderboard');assert(ids.leaderboardList.innerHTML.includes('5,200'));as
 app.start('sprint');run('lines=40; score=8000');assert(app.checkGoal());saved=JSON.parse(storage.get('tetrisPinasProgress'));assert(saved.matches.at(-1).success);
 app.start('blitz');app.tick(120000);assert.equal(ids.resultTitle.textContent,"Time's up!");assert.equal(JSON.parse(storage.get('tetrisPinasProgress')).matches.at(-1).duration,120000);
 app.start('practice');const y=run('player.y');for(let t=2000;t<12000;t+=100)run('update('+t+')');assert.equal(run('player.y'),y,'Practice must not auto-drop');run('playerDrop()');assert.equal(run('player.y'),y+1);
-app.go('settings');ids.settingGhost.checked=false;ids.settingEffects.checked=false;ids.settingTheme.value='night';ids.settingsForm.fire('submit');assert(!app.settings.ghost);assert.equal(app.settings.buttons,false);assert.equal(app.settings.hints,false);assert(!html.includes('class="game-controls"'));assert(!html.includes('class="tip-card"'));assert.equal(document.body.dataset.theme,'night');
+app.go('settings');ids.settingGhost.checked=false;ids.settingEffects.checked=false;ids.settingsForm.fire('submit');assert(!app.settings.ghost);assert.equal(app.settings.buttons,false);assert.equal(app.settings.hints,false);assert(!html.includes('class="game-controls"'));assert(!html.includes('class="tip-card"'));assert.equal(document.body.dataset.theme,'fiesta');assert(!ids.settingTheme);assert(!ids.settingPracticeHints);assert(ids.vibrationSetting.classList.contains('hidden'),'Unsupported vibration is hidden');
 app.go('profile');ids.profileName.value='<Player>';ids.profileIcon.value='★';ids.profileForm.fire('submit');assert.equal(ids.accountName.textContent,'<Player>');assert.equal(JSON.parse(storage.get('tetrisPinasProgress')).profiles['test-player'].name,'<Player>');
 app.resume();run('board=TetrisCore.createBoard();player=TetrisCore.makePiece("O")');
 boardFrame.fire('pointermove',{pointerType:'mouse',clientX:199,clientY:100});assert.equal(run('player.x'),8,'Mouse reaches right wall without crossing it');
@@ -113,3 +113,57 @@ console.log('PASS: hidden-game freeze, guest home, start/resume, pause timer, mo
     assert.equal(timers.length,0,'No fade or animation delay');
     console.log('PASS: supplied static logo, three-second wait, immediate dashboard.');
 })();
+
+// Web Audio contract: music timing, distinct cues, mute, and pause behavior.
+const audioVoices=[];
+const audioNoise=[];
+sandbox.AudioContext=class {
+    constructor(){this.state='running';this.currentTime=0;this.destination={};this.sampleRate=128;}
+    createDynamicsCompressor(){return {threshold:{},knee:{},ratio:{},attack:{},release:{},connect(){}};}
+    createBuffer(channels,length){return {getChannelData(){return new Float32Array(length);}};}
+    createBufferSource(){audioNoise.push({});return {connect(){},disconnect(){},start(){},stop(){}};}
+    createBiquadFilter(){return {Q:{},frequency:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}
+    createOscillator(){const record={};audioVoices.push(record);return {frequency:{setValueAtTime(v){record.frequency=v;},exponentialRampToValueAtTime(v){record.endFrequency=v;}},connect(){},disconnect(){},start(){},stop(){}};}
+    createGain(){return {gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}
+};
+document.hidden=false;
+app.settings.sound=true;app.settings.soundVolume=50;app.settings.musicVolume=30;
+app.start('practice');
+let beforeAudio=audioVoices.length;
+let beforeNoise=audioNoise.length;
+app.cue('lock');assert.equal(audioVoices.length-beforeAudio,2,'Landing has a bass impact and click');
+assert(audioNoise.length>beforeNoise,'Landing adds a textured crash');
+assert(audioVoices[beforeAudio].endFrequency<audioVoices[beforeAudio].frequency,'Landing pitch falls');
+beforeAudio=audioVoices.length;app.cue('clear',4);assert.equal(audioVoices.length-beforeAudio,6,'Four-line clear has a bass explosion and longer flourish');
+assert(audioVoices.at(-1).frequency>audioVoices[beforeAudio].frequency,'Clear chime rises');
+beforeAudio=audioVoices.length;beforeNoise=audioNoise.length;app.musicTick();assert(audioVoices.length>beforeAudio,'Gameplay music plays');
+assert(audioNoise.length>beforeNoise,'Music includes noise-based drums and cymbals');
+beforeAudio=audioVoices.length;app.musicTick();assert.equal(audioVoices.length,beforeAudio,'Same beat does not replay');
+beforeNoise=audioNoise.length;
+run('paused=true');app.tick(500);app.musicTick();assert.equal(audioVoices.length,beforeAudio,'Paused game does not schedule music');
+run('paused=false');app.settings.musicVolume=0;app.tick(500);app.musicTick();assert.equal(audioVoices.length,beforeAudio,'Music volume zero is silent');
+app.settings.soundVolume=0;app.cue('lock');assert.equal(audioVoices.length,beforeAudio,'Effects volume zero is silent');
+app.settings.soundVolume=50;app.settings.sound=false;app.cue('clear',2);assert.equal(audioVoices.length,beforeAudio,'Effects toggle mutes clears');
+assert.equal(audioNoise.length,beforeNoise,'Paused and muted audio schedules no percussion');
+console.log('PASS: music loop, landing impact, rising clear flourish, beat deduplication, pause, and independent mute controls.');
+
+// Exercise the actual settings controls rather than assigning settings directly.
+app.go('settings');
+for (const [id,key] of [['settingGhost','ghost'],['settingGrid','grid'],['settingEffects','effects'],['settingSound','sound'],['settingVibration','vibration'],['settingPracticeGravity','practiceGravity']]) {
+    ids[id].checked=true;ids[id].fire('change');assert.equal(app.settings[key],true,id+' enables immediately');
+    ids[id].checked=false;ids[id].fire('change');assert.equal(app.settings[key],false,id+' disables immediately');
+}
+ids.settingMusicVolume.value='42';ids.settingMusicVolume.fire('input');assert.equal(app.settings.musicVolume,42);assert.equal(ids.settingMusicVolumeValue.textContent,'42%');
+ids.settingSoundVolume.value='0';ids.settingSoundVolume.fire('input');assert.equal(app.settings.soundVolume,0);
+for (const [id,key,value] of [['settingPracticeSpeed','practiceSpeed',250],['settingDas','das',100],['settingArr','arr',20],['settingSoftDropFactor','softDropFactor',40]]) {
+    ids[id].value=value;ids[id].fire('change');assert.equal(app.settings[key],value,id+' applies immediately');
+}
+ids.controlLeft.value='KeyA';ids.controlLeft.fire('change');assert.equal(app.settings.controls.left,'KeyA');
+ids.settingPracticeGravity.checked=true;ids.settingPracticeGravity.fire('change');assert.equal(run('getDropInterval()'),250,'Practice uses configured gravity');
+ids.settingPracticeGravity.checked=false;ids.settingPracticeGravity.fire('change');assert.equal(run('getDropInterval()'),Infinity,'Practice gravity off stops automatic falling');
+const persistedSettings=JSON.parse(storage.get('tetrisPinasSettings'));assert.equal(persistedSettings.sound,false);assert.equal(persistedSettings.soundVolume,0);assert.equal(persistedSettings.musicVolume,42);
+vm.runInContext(fs.readFileSync('app.js','utf8'),sandbox);
+assert.equal(sandbox.tetrisApp.settings.sound,false,'Reload preserves sound-effects mute');
+assert.equal(sandbox.tetrisApp.settings.soundVolume,0,'Reload preserves zero effect volume');
+assert.equal(sandbox.tetrisApp.settings.musicVolume,42,'Reload preserves chosen music volume');
+console.log('PASS: live settings toggles, volume sliders, keyboard bindings, movement values, Practice gravity, persistence, and reload with muted effects.');

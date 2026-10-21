@@ -3,7 +3,7 @@
     'use strict';
     const $ = id => document.getElementById(id);
     const MODES = { marathon: 'Marathon', sprint: '40-line Sprint', blitz: 'Blitz', practice: 'Practice', versus: 'Online Versus' };
-    const defaults = { ghost: true, ghostOutlineVersion: 1, grid: true, effects: true, sound: false, vibration: false, buttons: false, hints: true, practiceHints: false, practiceGravity: false, practiceSpeed: 1000, das: 150, arr: 30, softDropFactor: 20, musicVolume: 0, soundVolume: 50, controls: {}, theme: 'fiesta' };
+    const defaults = { ghost: true, ghostOutlineVersion: 1, grid: true, effects: true, sound: true, audioVersion: 2, vibration: false, buttons: false, hints: true, practiceHints: false, practiceGravity: false, practiceSpeed: 1000, das: 150, arr: 30, softDropFactor: 20, musicVolume: 70, soundVolume: 75, controls: {}, theme: 'fiesta' };
     const avatars = ['default', '★', '🦅', '☀', '🌺', '⚡'];
     let storageAvailable = true;
     function read(key, fallback) {
@@ -36,6 +36,14 @@
     let recorded = false;
     let currentPage = 'home';
     let audio;
+    let audioMaster;
+    let noiseBuffer;
+    const audioSources = new Set();
+    function stopAudioSources() {
+        for (const source of audioSources) { try { source.stop(); } catch {} }
+        audioSources.clear();
+        musicBeat = -1;
+    }
     let musicBeat = -1;
     let sessionSaveElapsed = 0;
     let pendingOnlineAward = null;
@@ -173,21 +181,27 @@
         // Old saved preferences must not restore the removed controls.
         settings.buttons = false;
         settings.hints = false;
+        settings.practiceHints = false;
+        settings.theme = 'fiesta';
+        document.body.dataset.theme = 'fiesta';
         gameScreen.classList.remove('with-buttons');
     }
     function renderGuide() {
         const label = code => ({ArrowLeft:'Left',ArrowRight:'Right',ArrowUp:'Up',ArrowDown:'Down',Space:'Space',ShiftLeft:'Shift',ShiftRight:'Shift'}[code] || code.replace(/^Key/,''));
         const binding = (name, fallback) => label(settings.controls[name] || fallback);
         $('guideKey-leftRight').textContent = binding('left','ArrowLeft')+' / '+binding('right','ArrowRight');
-        $('guideKey-rotateCW').textContent = binding('rotateCW','ArrowUp');
-        $('guideKey-rotateCCW').textContent = binding('rotateCCW','KeyZ')+' / X';
+        $('guideKey-rotateCW').textContent = [...new Set([binding('rotateCW','ArrowUp'),'X'])].join(' / ');
+        $('guideKey-rotateCCW').textContent = binding('rotateCCW','KeyZ');
         $('guideKey-softDrop').textContent = binding('softDrop','ArrowDown');
         $('guideKey-hardDrop').textContent = binding('hardDrop','Space');
         $('guideKey-hold').textContent = binding('hold','KeyC')+' / Shift';
     }
     function renderSettings() {
-        ['Ghost','Grid','Effects','Sound','Vibration','PracticeGravity','PracticeHints'].forEach(label => { $('setting' + label).checked = settings[label.charAt(0).toLowerCase()+label.slice(1)]; });
-        $('settingTheme').value = settings.theme;
+        ['Ghost','Grid','Effects','Sound','Vibration','PracticeGravity'].forEach(label => { $('setting' + label).checked = settings[label.charAt(0).toLowerCase()+label.slice(1)]; });
+        $('vibrationSetting').classList.toggle('hidden', typeof navigator.vibrate !== 'function');
+        $('toggleFullscreen').classList.toggle('hidden', !document.documentElement?.requestFullscreen && !document.fullscreenElement);
+        for (const name of ['MusicVolume','SoundVolume']) $('setting'+name+'Value').textContent = settings[name.charAt(0).toLowerCase()+name.slice(1)] + '%';
+        $('settingsSaveStatus').textContent = 'Changes save automatically.';
         for (const name of ['PracticeSpeed','Das','Arr','SoftDropFactor','MusicVolume','SoundVolume']) $('setting'+name).value=settings[name.charAt(0).toLowerCase()+name.slice(1)];
         for (const name of ['Left','Right','SoftDrop','HardDrop','RotateCW','RotateCCW','Hold']) {
             const key=name.charAt(0).toLowerCase()+name.slice(1);
@@ -360,17 +374,6 @@
         if (!active || paused || gameOver) return;
         elapsed = mode==='blitz' ? Math.min(120000,elapsed+delta) : elapsed+delta;
         if (mode==='marathon') { sessionSaveElapsed+=delta; if (sessionSaveElapsed>=1000) {sessionSaveElapsed=0;saveSession();} }
-        if (settings.musicVolume>0 && audio?.state==='running' && musicBeat!==Math.floor(elapsed/420)) {
-            musicBeat=Math.floor(elapsed/420);
-            const notes=[220,261.63,329.63,261.63,196,246.94,293.66,246.94];
-            const oscillator=audio.createOscillator(), gain=audio.createGain();
-            oscillator.type='triangle'; oscillator.frequency.value=notes[musicBeat%notes.length];
-            const volume=Math.min(.045,settings.musicVolume/2200);
-            gain.gain.setValueAtTime(volume,audio.currentTime);
-            gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.22);
-            oscillator.connect(gain);gain.connect(audio.destination);
-            oscillator.start();oscillator.stop(audio.currentTime+.23);
-        }
         updateClock();
         if (mode === 'blitz' && elapsed >= 120000) { elapsed = 120000; finish('time'); }
     }
@@ -382,17 +385,132 @@
         if (!settings.sound && settings.musicVolume<=0) return;
         try { const Audio = window.AudioContext || window.webkitAudioContext; if (!audio && Audio) audio = new Audio(); if (audio?.state === 'suspended') audio.resume().catch(() => {}); } catch { /* Sound is optional. */ }
     }
-    function cue(kind) {
+    function audioOutput() {
+        if (!audioMaster) {
+            // Keep overlapping drums and gameplay impacts from clipping.
+            audioMaster = audio.createDynamicsCompressor();
+            audioMaster.threshold.value = -12;
+            audioMaster.knee.value = 12;
+            audioMaster.ratio.value = 4;
+            audioMaster.attack.value = .003;
+            audioMaster.release.value = .12;
+            const output = audio.createGain();
+            output.gain.value = 1.45;
+            audioMaster.connect(output); output.connect(audio.destination);
+        }
+        return audioMaster;
+    }
+    function noise(duration, volume, cutoff = 1500, endCutoff = cutoff, delay = 0, highpass = false) {
+        if (!audio || audio.state !== 'running' || volume <= 0) return;
+        if (!noiseBuffer) {
+            noiseBuffer = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+        }
+        const time = audio.currentTime + delay;
+        const source = audio.createBufferSource(), filter = audio.createBiquadFilter(), gain = audio.createGain();
+        source.buffer = noiseBuffer;
+        filter.type = highpass ? 'highpass' : 'lowpass';
+        filter.Q.value = .8;
+        filter.frequency.setValueAtTime(cutoff, time);
+        filter.frequency.exponentialRampToValueAtTime(endCutoff, time + duration);
+        gain.gain.setValueAtTime(.0001, time);
+        gain.gain.linearRampToValueAtTime(volume, time + .003);
+        gain.gain.exponentialRampToValueAtTime(.0001, time + duration);
+        source.connect(filter); filter.connect(gain); gain.connect(audioOutput());
+        audioSources.add(source);
+        source.onended = () => { audioSources.delete(source); source.disconnect(); filter.disconnect(); gain.disconnect(); };
+        source.start(time); source.stop(time + duration + .01);
+    }
+    // Short synthesized voices need no downloads and stay within the volume controls.
+    function voice(frequency, duration, volume, type = 'triangle', delay = 0, endFrequency = frequency) {
+        if (!audio || audio.state !== 'running' || volume <= 0) return;
+        const time = audio.currentTime + delay;
+        const oscillator = audio.createOscillator(), gain = audio.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, time);
+        oscillator.frequency.exponentialRampToValueAtTime(endFrequency, time + duration);
+        gain.gain.setValueAtTime(.0001, time);
+        gain.gain.linearRampToValueAtTime(volume, time + .006);
+        gain.gain.exponentialRampToValueAtTime(.0001, time + duration);
+        oscillator.connect(gain); gain.connect(audioOutput());
+        audioSources.add(oscillator);
+        oscillator.onended = () => { audioSources.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+        oscillator.start(time); oscillator.stop(time + duration + .01);
+    }
+    function musicTick() {
+        if (!active || paused || gameOver || document.hidden || gameScreen.classList.contains('hidden') || settings.musicVolume <= 0 || audio?.state !== 'running') return;
+        // 174 BPM, sixteen steps per bar; a complete 16-bar build/drop arrangement.
+        const beat = Math.floor(elapsed / (60000 / 174 / 4));
+        if (beat === musicBeat) return;
+        musicBeat = beat;
+        const step = beat % 16, bar = Math.floor(beat / 16) % 16;
+        const build = bar >= 12;
+        const hz = note => 440 * Math.pow(2, (note - 69) / 12);
+        const volume = Math.max(0, Math.min(100, settings.musicVolume)) / 100;
+        const root = [33,29,36,31][Math.floor(bar / 2) % 4];
+        // Heavy syncopated sub-bass and a detuned, growling mid-bass layer.
+        if ([0,3,6,8,10,14].includes(step) && !(build && step % 2)) {
+            const pitch = hz(root + (step === 14 ? 12 : 0));
+            voice(pitch, .22, volume * .30, 'sine');
+            voice(pitch * 2, .14, volume * .13, 'sawtooth', 0, pitch * 1.94);
+            voice(pitch * 2.015, .14, volume * .08, 'square');
+        }
+        // Wide power-chord stabs make the drop feel much larger than a single-note loop.
+        if (step === 0 || step === 8) {
+            [12,19,24].forEach(interval => {
+                const pitch = hz(root + interval);
+                voice(pitch * .995, .34, volume * .055, 'sawtooth');
+                voice(pitch * 1.005, .34, volume * .055, 'sawtooth');
+            });
+        }
+        const riff = [24,0,31,36,27,31,39,36,24,31,36,43,39,36,31,27];
+        const note = riff[step];
+        if (note && (bar % 4 < 3 || step % 2 === 0)) {
+            const pitch = hz(root + note);
+            voice(pitch, .12, volume * .085, 'sawtooth');
+            voice(pitch * 1.008, .16, volume * .045, 'square');
+            voice(pitch, .15, volume * .025, 'triangle', .12);
+        }
+        // Actual noise-based snare, clap and cymbal textures, over a deep kick.
+        if ([0,6,8,11].includes(step)) {
+            voice(190, .22, volume * .48, 'sine', 0, 36);
+            noise(.028, volume * .12, 4200, 700);
+        }
+        if (step === 4 || step === 12 || (bar % 4 === 3 && step >= 14)) {
+            voice(205, .13, volume * .16, 'triangle', 0, 100);
+            noise(.19, volume * .31, 6500, 1600);
+            noise(.09, volume * .12, 3200, 1400, .025, true);
+        }
+        noise(step % 4 === 2 ? .12 : .035, volume * (step % 4 === 2 ? .095 : .055), 7500, 5500, 0, true);
+        if (step === 0 && bar % 4 === 0) {
+            noise(.7, volume * .20, 4500, 11000, 0, true);
+            voice(95, .45, volume * .18, 'sawtooth', 0, 32);
+        }
+        if (build) {
+            // Rising pitch and denser rolls lead into the next drop.
+            if (step % (bar >= 14 ? 1 : 2) === 0) noise(.075, volume * .10, 2400, 7000);
+            if (step === 0) voice(hz(60 + (bar - 12) * 4), .65, volume * .06, 'sawtooth', 0, hz(72 + (bar - 12) * 4));
+        }
+    }
+
+    function cue(kind, count = 1) {
         if (settings.vibration && navigator.vibrate) navigator.vibrate(kind === 'finish' ? [40,30,40] : 15);
-        if (!settings.sound || !audio || audio.state !== 'running') return;
-        const oscillator = audio.createOscillator();
-        const gain = audio.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = kind === 'finish' ? 660 : 220;
-        gain.gain.setValueAtTime(Math.max(.001,Math.min(.08,settings.soundVolume/1000)), audio.currentTime);
-        gain.gain.exponentialRampToValueAtTime(.001, audio.currentTime + .12);
-        oscillator.connect(gain); gain.connect(audio.destination);
-        oscillator.start(); oscillator.stop(audio.currentTime + .13);
+        unlockAudio();
+        if (!settings.sound || !audio || audio.state !== 'running' || settings.soundVolume <= 0 || document.hidden) return;
+        const volume = Math.max(0, Math.min(100, settings.soundVolume)) / 100;
+        if (kind === 'lock') {
+            voice(245, .20, volume * .48, 'sine', 0, 34);
+            voice(1100, .06, volume * .16, 'sawtooth', 0, 110);
+            noise(.095, volume * .24, 3600, 220);
+        } else if (kind === 'clear') {
+            noise(count >= 4 ? .5 : .24, volume * .28, 900, 10000);
+            voice(180, .25, volume * .29, 'sawtooth', 0, 38);
+            const notes = count >= 4 ? [523.25,659.25,783.99,1046.5,1318.51] : [523.25,659.25,783.99,1046.5].slice(0, Math.min(4, count + 2));
+            notes.forEach((note, i) => voice(note, count >= 4 ? .32 : .20, volume * .22, 'square', i * .045, note * 1.025));
+        } else if (kind === 'finish') {
+            [523.25,659.25,783.99,1046.5].forEach((note, i) => voice(note, .38, volume * .14, 'square', i * .075));
+        }
     }
     function openAuth() {
         if (active && !gameOver && !paused) togglePause();
@@ -427,21 +545,39 @@
         if (storageAvailable) notice('Profile saved.');
     });
     $('profileName').addEventListener('input', () => $('profileName').setCustomValidity(''));
-    $('settingsForm').addEventListener('submit', event => {
-        event.preventDefault();
-        ['Ghost','Grid','Effects','Sound','Vibration','PracticeGravity','PracticeHints'].forEach(label => { settings[label.charAt(0).toLowerCase()+label.slice(1)] = $('setting' + label).checked; });
-        for (const [name,min,max] of [['PracticeSpeed',100,3000],['Das',50,500],['Arr',10,150],['SoftDropFactor',2,100],['MusicVolume',0,100],['SoundVolume',0,100]]) {
-            const key=name.charAt(0).toLowerCase()+name.slice(1);
-            settings[key]=Math.max(min,Math.min(max,Number($('setting'+name).value)||min));
+    function saveSettingsFromForm() {
+        const controls = {};
+        for (const name of ['Left','Right','SoftDrop','HardDrop','RotateCW','RotateCCW','Hold']) controls[name.charAt(0).toLowerCase()+name.slice(1)] = $('control'+name).value;
+        if (new Set(Object.values(controls)).size !== Object.keys(controls).length) {
+            $('settingsSaveStatus').textContent = 'Choose a different key for each action.';
+            notice('Choose a different key for each action.');
+            return false;
         }
-        const controls={};
-        for (const name of ['Left','Right','SoftDrop','HardDrop','RotateCW','RotateCCW','Hold']) controls[name.charAt(0).toLowerCase()+name.slice(1)]=$('control'+name).value;
-        if (new Set(Object.values(controls)).size!==Object.keys(controls).length) { notice('Choose a different key for each action.'); return; }
-        settings.controls=controls;
-        settings.theme = $('settingTheme').value;
+        const previousGravity = settings.practiceGravity, previousSpeed = settings.practiceSpeed;
+        for (const name of ['Ghost','Grid','Effects','Sound','Vibration','PracticeGravity']) settings[name.charAt(0).toLowerCase()+name.slice(1)] = $('setting'+name).checked;
+        for (const [name,min,max] of [['PracticeSpeed',100,3000],['Das',50,500],['Arr',10,150],['SoftDropFactor',2,100],['MusicVolume',0,100],['SoundVolume',0,100]]) {
+            const value = Number($('setting'+name).value);
+            settings[name.charAt(0).toLowerCase()+name.slice(1)] = Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
+            $('setting'+name).value = settings[name.charAt(0).toLowerCase()+name.slice(1)];
+        }
+        settings.controls = controls;
+        settings.theme = 'fiesta';
+        if (previousGravity !== settings.practiceGravity || previousSpeed !== settings.practiceSpeed) dropCounter = 0;
+        if (!settings.effects) { effects = []; boardFlash = 0; }
+        if (!settings.vibration) navigator.vibrate?.(0);
+        stopAudioSources();
         save('tetrisPinasSettings', settings);
         applySettings(); unlockAudio();
-        if (storageAvailable) notice('Settings saved.');
+        for (const name of ['MusicVolume','SoundVolume']) $('setting'+name+'Value').textContent = $('setting'+name).value + '%';
+        $('settingsSaveStatus').textContent = storageAvailable ? 'Settings saved automatically.' : 'Applied for this session; browser storage is unavailable.';
+        return true;
+    }
+    for (const name of ['Ghost','Grid','Effects','Sound','Vibration','PracticeGravity','PracticeSpeed','Das','Arr','SoftDropFactor']) $('setting'+name).addEventListener('change', saveSettingsFromForm);
+    for (const name of ['Left','Right','SoftDrop','HardDrop','RotateCW','RotateCCW','Hold']) $('control'+name).addEventListener('change', saveSettingsFromForm);
+    for (const name of ['MusicVolume','SoundVolume']) $('setting'+name).addEventListener('input', saveSettingsFromForm);
+    $('settingsForm').addEventListener('submit', event => {
+        event.preventDefault();
+        if (saveSettingsFromForm() && storageAvailable) notice('Settings saved.');
     });
     $('toggleFullscreen').addEventListener('click', () => {
         if (document.fullscreenElement) document.exitFullscreen?.();
@@ -465,11 +601,13 @@
         $('hubScreen').classList.add('hidden');
         authForm.reset(); setAuthMode('login'); showAuthScreen();
     });
+    document.addEventListener('pointerdown', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
     document.addEventListener('visibilitychange', () => { if (document.hidden && active && !paused && !gameOver && !window.onlinePlay?.active) togglePause(); });
     window.addEventListener?.('pagehide',saveSession);
     document.addEventListener('keydown', event => {
         if (event.code === 'Escape' && !gameScreen.classList.contains('hidden') && !$('matchMenu').open) { event.preventDefault(); openMenu(); }
     });
-    window.tetrisApp = { enter, tick, checkGoal, finish, cue, onReset, start, go, resume, saveSession, updateModeInfo, onlineXp(amount,room) { pendingOnlineAward={amount:Math.max(0,Math.min(125,Number(amount)||0)),room:String(room||'')}; }, onlineTime(milliseconds) { elapsed = Math.max(0, milliseconds); }, get mode() { return mode; }, settings };
+    window.tetrisApp = { enter, tick, musicTick, checkGoal, finish, cue, onReset, start, go, resume, saveSession, updateModeInfo, onlineXp(amount,room) { pendingOnlineAward={amount:Math.max(0,Math.min(125,Number(amount)||0)),room:String(room||'')}; }, onlineTime(milliseconds) { elapsed = Math.max(0, milliseconds); }, get mode() { return mode; }, settings };
     applySettings();
 })();

@@ -342,9 +342,9 @@ function lockPiece() {
     if (!window.tetrisApp || window.tetrisApp.settings.effects) triggerHitEffect();
     const tSpin = TetrisCore.isTSpin(board,player);
     const lockedAboveVisible = mergePiece();
+    window.tetrisApp?.cue("lock");
     clearLines(tSpin);
     if (window.tetrisApp) {
-        window.tetrisApp.cue("lock");
         if (window.tetrisApp.checkGoal()) { updateStats(); return; }
     }
     if (lockedAboveVisible) { endGame(); updateStats(); return; }
@@ -422,6 +422,7 @@ function clearLines(tSpin = false) {
     score += result.points;
     lines += cleared;
     if (cleared) {
+        window.tetrisApp?.cue("clear", cleared);
         triggerClearEffect(clearedRows.filter(y => y >= HIDDEN_ROWS).map(y => y - HIDDEN_ROWS));
         const label = tSpin ? 'T-SPIN' : ['', 'GALING!', 'AYOS!', 'ASTIG!', '★ PINAS TETRIS! ★'][cleared];
         showCombo(perfectClear ? 'PERFECT CLEAR!' : label);
@@ -1244,7 +1245,8 @@ function update(time = 0) {
             }
             if (softDropHeld) {
                 softDropCounter += deltaTime;
-                const softInterval = Math.min(getDropInterval()/Math.max(1,Number(settings.softDropFactor || 20)),50);
+                const fallInterval = getDropInterval();
+                const softInterval = Math.max(10,(Number.isFinite(fallInterval) ? fallInterval : 1000)/Math.max(1,Number(settings.softDropFactor || 20)));
                 while (softDropCounter >= softInterval && !gameOver && !collision(player.matrix,player.x,player.y+1)) {
                     playerDrop(true);
                     softDropCounter -= softInterval;
@@ -1271,6 +1273,7 @@ function update(time = 0) {
 
 
     if (window.onlinePlay?.active) window.onlinePlay.tick();
+    window.tetrisApp?.musicTick();
     syncMouseTarget();
     draw();
 
