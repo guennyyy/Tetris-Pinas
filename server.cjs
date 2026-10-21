@@ -10,7 +10,13 @@ function createMultiplayerServer(options={}) {
  const accountFile=options.accountFile||process.env.ACCOUNT_FILE||path.join(root,'.tetris-accounts.json');
  let accounts={};
  try { accounts=JSON.parse(fs.readFileSync(accountFile,'utf8')); } catch { accounts={}; }
- const saveAccounts=()=>{const temporary=accountFile+'.tmp';fs.writeFileSync(temporary,JSON.stringify(accounts),{mode:0o600});fs.renameSync(temporary,accountFile);};
+ const saveAccounts=()=>{
+  try { fs.mkdirSync(path.dirname(accountFile),{recursive:true});const temporary=accountFile+'.tmp';fs.writeFileSync(temporary,JSON.stringify(accounts),{mode:0o600});fs.renameSync(temporary,accountFile); }
+  catch { throw Object.assign(new Error('Account storage is unavailable. Please contact the game owner.'),{status:503}); }
+ };
+ const configuredOrigins=[options.publicOrigin??process.env.PUBLIC_ORIGIN,options.renderExternalUrl??process.env.RENDER_EXTERNAL_URL].filter(Boolean).map(value=>{
+  try {const url=new URL(String(value).trim());return ['http:','https:'].includes(url.protocol)?url.origin:null;} catch {return null;}
+ }).filter(Boolean);
  const passwordHash=(password,salt)=>crypto.scryptSync(password,salt,64).toString('hex');
  const allowedFiles=new Set(['index.html','style.css','app.css','dashboard.css','glass.css','mechanics.css','amber-glass.css','how-to-play.css','settings.css','tetris-core.js','app.js','game.js','online.js','friends.js','background.jfif','board-background.jfif','bg-fiesta.svg']);
  for(const name of ['logo','logo-original','sidebar-art','sidebar-full-v2','sunset','online','marathon','sprint','blitz','practice','trophy','controller','blocks','avatar']) allowedFiles.add(`Assets/dashboard/${name}.png`);
@@ -102,8 +108,9 @@ function createMultiplayerServer(options={}) {
     res.on('close',()=>{clearInterval(heartbeat);if(s.stream===res){s.stream=null;s.disconnectedAt=clock();}});return;
    }
    if(req.method!=='POST')throw error(404,'Not found.');
-   const origin=req.headers.origin;const allowedOrigin=process.env.PUBLIC_ORIGIN;
-   if(origin&&origin!==(allowedOrigin||`http://${req.headers.host}`))throw error(403,'Request origin is not allowed.');
+   const origin=req.headers.origin;
+   const allowedOrigins=configuredOrigins.length?configuredOrigins:[`http://${req.headers.host}`];
+   if(origin&&!allowedOrigins.includes(origin))throw error(403,'Request origin is not allowed.');
    if(req.headers['x-tetris-request']!=='1')throw error(403,'Missing request header.');
    const data=await body(req);
    if(!data||typeof data!=='object'||Array.isArray(data))throw error(400,'Request must be a JSON object.');
@@ -119,7 +126,7 @@ function createMultiplayerServer(options={}) {
      if(account)throw error(409,'This Gmail account already exists. Log in instead.');
      const salt=crypto.randomBytes(16).toString('hex');
      account={id:crypto.randomUUID(),email,name,salt,passwordHash:passwordHash(password,salt),createdAt:clock()};
-     accounts[account.id]=account;saveAccounts();
+     accounts[account.id]=account;try {saveAccounts();} catch(err) {delete accounts[account.id];throw err;}
     }else{
      const candidate=passwordHash(password,account?.salt||'0'.repeat(32));
      if(!account||!crypto.timingSafeEqual(Buffer.from(candidate,'hex'),Buffer.from(account.passwordHash,'hex'))){

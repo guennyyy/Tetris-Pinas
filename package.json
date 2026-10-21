@@ -1,8 +1,13 @@
-﻿{
+{
   "name": "tetris-pinas",
   "version": "1.0.0",
   "private": true,
   "description": "Tetris Pinas with server-controlled online versus rooms",
-  "scripts": { "start": "node server.cjs", "test": "node tetris-core-test.cjs && node flow-smoke-test.cjs && node multiplayer-test.cjs" },
-  "engines": { "node": ">=22" }
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node tetris-core-test.cjs && node flow-smoke-test.cjs && node multiplayer-test.cjs && node hosted-auth-test.cjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }

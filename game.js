@@ -518,9 +518,11 @@ async function continueAsGuest() {
 }
 
 async function serverAuthRequest(path,data) {
-    await fetch('/api/session',{credentials:'same-origin'});
+    const session=await fetch('/api/session',{credentials:'same-origin'});
+    if (!session.ok) throw new Error('The account server is unavailable. Please try again shortly.');
     const response=await fetch('/api/'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tetris-Request':'1'},body:JSON.stringify(data)});
-    const result=await response.json();
+    let result;
+    try { result=await response.json(); } catch { throw new Error('The account server is unavailable. Please try again shortly.'); }
     if (!response.ok) throw new Error(result.error||'Sign-in failed.');
     return result;
 }
@@ -552,76 +554,63 @@ function handleErrorMessage(code) {
         "auth/credential-already-in-use": "This account is already linked to another sign-in method."
     };
 
-    authMessage.textContent = map[code] || "Authentication failed. Please try again.";
+    authMessage.textContent = map[code] || "Authentication failed (" + code + "). Please try again.";
 }
 
-function handleAuthSubmit(event) {
+﻿async function waitForAuth(operation) {
+    let timer;
+    try {
+        return await Promise.race([operation, new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Sign-in is taking too long. Check your connection and try again.')), 20000);
+        })]);
+    } finally { clearTimeout(timer); }
+}
+async function handleAuthSubmit(event) {
     event.preventDefault();
-
-    if (!firebaseReady) {
-        if (location.protocol==='file:') { authMessage.textContent='Open the multiplayer server address to log in or sign up.'; return; }
-        const email=authEmailInput.value.trim().toLowerCase(),password=authPasswordInput.value;
-        const name=displayNameInput.value.trim();
-        if (!isGmail(email)||password.length<8) { authMessage.textContent='Use a Gmail address and a password of at least 8 characters.'; return; }
-        if (authMode==='signup'&&!name) { authMessage.textContent='Enter a display name.'; return; }
-        authSubmit.disabled=true;
-        serverAuthRequest(authMode==='signup'?'signup':'login',{email,password,name}).then(result=>{
-            window.tetrisServerUser=result.user;window.tetrisGuestSession=false;
-            authMessage.textContent=`Welcome, ${result.user.name}!`;
-            showGameScreen();
-        }).catch(error=>{authMessage.textContent=error.message;}).finally(()=>{authSubmit.disabled=false;});
-        return;
-    }
-
+    if (authSubmit.disabled) return;
     const email = authEmailInput.value.trim().toLowerCase();
     const password = authPasswordInput.value;
-    const displayName = displayNameInput.value.trim();
-
-    if (!email || !password) {
-        authMessage.textContent = authMode === "login"
-            ? "Please enter your email and password."
-            : "Please fill in your email and password.";
+    const name = displayNameInput.value.trim();
+    if (!isGmail(email) || password.length < 8 || password.length > 128) {
+        authMessage.textContent = 'Use a Gmail address and a password of 8 to 128 characters.';
         return;
     }
-
-    if (!isGmail(email)) {
-        authMessage.textContent = "Please use a valid Gmail address ending with @gmail.com.";
+    if (authMode === 'signup' && !name) { authMessage.textContent = 'Enter a display name.'; return; }
+    if (!firebaseReady && window.location?.protocol === 'file:') {
+        authMessage.textContent = 'Open the multiplayer server address to log in or sign up.';
         return;
     }
-
-    if (authMode === "signup") {
-        if (!displayName) {
-            authMessage.textContent = "Please enter a display name.";
-            return;
-        }
-
-        firebase.auth().createUserWithEmailAndPassword(email, password)
-            .then(({ user }) => {
-                return user.updateProfile({ displayName }).then(() => user);
-            })
-            .then((user) => {
-                window.tetrisGuestSession = false;
-                window.tetrisServerUser = null;
-                authMessage.textContent = `Account created for ${user.displayName}!`;
-                setTimeout(() => showGameScreen(), 500);
-            })
-            .catch((error) => {
-                handleErrorMessage(error.code);
-            });
-        return;
-    }
-
-    firebase.auth().signInWithEmailAndPassword(email, password)
-        .then(({ user }) => {
-            window.tetrisGuestSession = false;
+    const signingUp = authMode === 'signup';
+    const originalLabel = authSubmit.textContent;
+    authSubmit.disabled = true;
+    authSubmit.textContent = signingUp ? 'CREATING ACCOUNT…' : 'SIGNING IN…';
+    authMessage.textContent = signingUp ? 'Creating your account…' : 'Signing in…';
+    showLoginBtn.disabled = showSignupBtn.disabled = true;
+    try {
+        if (firebaseReady) {
+            const result = await waitForAuth(signingUp
+                ? firebase.auth().createUserWithEmailAndPassword(email, password)
+                : firebase.auth().signInWithEmailAndPassword(email, password));
+            if (signingUp) await waitForAuth(result.user.updateProfile({displayName:name}));
             window.tetrisServerUser = null;
-            authMessage.textContent = `Welcome back, ${user.displayName || user.email.split("@")[0]}!`;
-            setTimeout(() => showGameScreen(), 500);
-        })
-        .catch((error) => {
-            handleErrorMessage(error.code);
-        });
+        } else {
+            const result = await waitForAuth(serverAuthRequest(signingUp ? 'signup' : 'login', {email,password,name}));
+            window.tetrisServerUser = result.user;
+        }
+        window.tetrisGuestSession = false;
+        authMessage.textContent = signingUp ? 'Account created. Welcome!' : 'Signed in. Welcome back!';
+        showGameScreen();
+    } catch (error) {
+        if (error.code) handleErrorMessage(error.code);
+        else authMessage.textContent = error.message || 'Unable to sign in. Please try again.';
+    } finally {
+        authSubmit.disabled = false;
+        showLoginBtn.disabled = showSignupBtn.disabled = false;
+        authSubmit.textContent = originalLabel;
+        requestAnimationFrame(fitAuthPanel);
+    }
 }
+
 
 function signInWithProvider(provider) {
     if (!firebaseReady) {
@@ -649,6 +638,10 @@ guestButton.addEventListener("click", continueAsGuest);
 showLoginBtn.addEventListener("click", () => setAuthMode("login"));
 showSignupBtn.addEventListener("click", () => setAuthMode("signup"));
 authForm.addEventListener("submit", handleAuthSubmit);
+authForm.addEventListener('invalid', event => {
+    authMessage.textContent = event.target.validationMessage || 'Please fill in all required fields.';
+    requestAnimationFrame(fitAuthPanel);
+}, true);
 
 document.querySelector(".social-button.google").addEventListener("click", () => signInWithProvider("google"));
 document.querySelector(".social-button.facebook").addEventListener("click", () => signInWithProvider("facebook"));
