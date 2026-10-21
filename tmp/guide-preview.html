@@ -1,0 +1,216 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head><base href="file:///C:/Users/Gwenneth/Desktop/TETRIS/">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Tetris Pinas</title>
+    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="app.css?v=6">
+    <link rel="stylesheet" href="dashboard.css?v=16">
+    <link rel="stylesheet" href="glass.css?v=1">
+    <link rel="stylesheet" href="mechanics.css?v=1">
+    <link rel="stylesheet" href="amber-glass.css?v=42">
+    <link rel="stylesheet" href="festival-game.css?v=3">
+    <link rel="stylesheet" href="how-to-play.css?v=1">
+    <script>
+        // Fit the whole reference dashboard, including Recent games, in the first view.
+        function sizeDashboard() {
+            const scale = Math.min(window.innerWidth / 1832, window.innerHeight / 859);
+            document.documentElement.style.setProperty('--dashboard-scale', scale);
+            document.documentElement.style.setProperty('--dashboard-height', `${window.innerHeight / scale}px`);
+            document.documentElement.style.setProperty('--dashboard-width', `${window.innerWidth / scale}px`);
+        }
+        sizeDashboard();
+        window.addEventListener('resize', sizeDashboard);
+    </script>
+</head>
+<body>
+    <svg class="nav-icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><linearGradient id="navGlass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff3ff"/><stop offset=".42" stop-color="#d19dff"/><stop offset="1" stop-color="#8069ea"/></linearGradient><linearGradient id="navEdge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff9ff"/><stop offset=".55" stop-color="#e6aaff"/><stop offset="1" stop-color="#8fe6ff"/></linearGradient></defs></svg>
+    <div id="introScreen" class="intro-screen hidden" aria-label="Tetris Pinas introduction">
+        <div class="intro-logo"><img src="Assets/dashboard/intro-logo.png" alt="Tetris Pinas"></div>
+    </div>
+
+    <div id="authScreen" class="auth-screen hidden">
+        <div class="auth-panel">
+            <div class="auth-brand"><img class="auth-logo" src="Assets/dashboard/logo-transparent.png" alt="Tetris Pinas"><h2 id="authHeading">Welcome back, Player!</h2><p id="authDescription">Sign in and continue your Tetris Pinas journey.</p></div>
+            <div class="auth-tabs">
+                <button id="showLogin" class="tab-button active" type="button">LOG IN</button>
+                <button id="showSignup" class="tab-button" type="button">SIGN UP</button>
+            </div>
+
+            <form id="authForm" class="auth-form">
+                <div id="displayNameField" class="field-group hidden">
+                    <label class="field-label" for="displayName">Display Name</label>
+                    <input id="displayName" name="displayName" type="text" placeholder="Player username" autocomplete="nickname" />
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="authEmail">Email</label>
+                    <input id="authEmail" name="email" type="email" placeholder="Email address" autocomplete="email" required />
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="authPassword">Password</label>
+                    <button id="toggleAuthPassword" class="password-visibility" type="button" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button><input id="authPassword" name="password" type="password" placeholder="••••••••" required />
+                </div>
+
+                <button id="forgotPassword" class="forgot-password" type="button">Forgot password?</button>
+                <button id="authSubmit" class="primary-button" type="submit">LOG IN</button>
+            </form>
+
+            <div class="divider"><span>OR</span></div>
+
+            <div class="social-actions">
+                <button class="social-button google" type="button"><span class="provider-logo google-logo" aria-hidden="true"><img src="Assets/dashboard/icons/google.jfif" alt=""></span>Continue with Google</button>
+                <button class="social-button facebook" type="button"><span class="provider-logo facebook-logo" aria-hidden="true"><img src="Assets/dashboard/icons/facebook.png" alt=""></span>Continue with Facebook</button>
+                <button id="guestButton" class="guest-link" type="button">Play without an account</button><p class="visitor-note">Log in or sign up to save progress and game history.</p>
+            </div>
+
+            <p id="authMessage" class="auth-message" aria-live="polite"></p>
+        </div>
+    </div>
+
+
+    <main id="hubScreen" class="hub">
+        <aside class="hub-sidebar" aria-label="Player navigation">
+        <header class="hub-header">
+            <a href="#home" class="hub-logo" data-page="home" aria-label="Tetris Pinas home"><img src="Assets/dashboard/logo-original.png" alt="Tetris Pinas"></a>
+        </header>
+        <nav class="hub-nav" aria-label="Main navigation">
+            <button type="button" data-page="home"><span class="nav-icon" aria-hidden="true"><svg class="nav-vector" viewBox="0 0 48 48"><path d="M12 7c0-2 2.2-3.3 4-2.2l27 16.5c2 1.2 2 4.2 0 5.4L16 43.2c-1.8 1.1-4-.2-4-2.2Z" fill="url(#navGlass)" stroke="url(#navEdge)" stroke-width="2.6" stroke-linejoin="round"/><path d="m17 11 21 13" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="2" stroke-linecap="round"/></svg></span>Play</button>
+            <button type="button" data-page="online"><span class="nav-icon" aria-hidden="true"><svg class="nav-vector" viewBox="0 0 48 48"><circle cx="17" cy="16" r="7" fill="url(#navGlass)" stroke="url(#navEdge)" stroke-width="2.3"/><circle cx="34" cy="18" r="6" fill="url(#navGlass)" stroke="url(#navEdge)" stroke-width="2.3"/><path d="M4 41v-4c0-7 5-12 13-12s13 5 13 12v4Zm26-13c7-3 14 2 14 10v3H30" fill="url(#navGlass)" stroke="url(#navEdge)" stroke-width="2.3" stroke-linejoin="round"/></svg></span>Online</button>
+            <button type="button" data-page="leaderboard"><span class="nav-icon" aria-hidden="true"><svg class="nav-vector" viewBox="0 0 48 48"><path d="M14 7h20v15c0 8-4 14-10 14s-10-6-10-14Z" fill="url(#navGlass)" stroke="url(#navEdge)" stroke-width="2.4"/><path d="M14 12H6v7c0 5 3 8 9 9m19-16h8v7c0 5-3 8-9 9M24 36v6m-10 2h20" fill="none" stroke="url(#navEdge)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 12h12" stroke="#fff" stroke-opacity=".8" stroke-width="2" stroke-linecap="round"/></svg></span>Leaderboard</button>
+        </nav>
+        <div class="sidebar-bottom">
+            <button id="accountButton" class="account-chip" type="button" data-page="profile" aria-label="Open profile" title="Profile"><span id="accountAvatar"><img class="profile-photo" src="Assets/dashboard/default-profile-transparent.png" alt=""></span><span class="account-details"><span id="accountName">Player</span><small id="accountSubtitle">Player</small></span><span class="profile-edit" aria-hidden="true"><img class="glass-glyph" src="Assets/dashboard/icons/edit.png" alt=""></span></button>
+            <div id="sidebarPlayerLevel" class="player-level"><progress id="playerXP" max="2000" value="0" aria-label="Player experience"></progress><div><strong id="playerLevel">Lv. 1</strong><span id="playerXPLabel">0 / 2,000 XP</span></div></div>
+        <nav class="hub-nav sidebar-utilities" aria-label="Information and settings">
+            <button type="button" data-page="guide"><span class="nav-icon" aria-hidden="true"><svg class="nav-vector" viewBox="0 0 48 48"><path d="M24 11C18 7 11 6 5 9v29c7-2 13-1 19 3 6-4 12-5 19-3V9c-6-3-13-2-19 2Z" fill="url(#navGlass)" stroke="url(#navEdge)" stroke-width="2.5" stroke-linejoin="round"/><path d="M24 11v30M10 15c3-1 6-.6 9 1m10 0c3-1.6 6-2 9-1" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2" stroke-linecap="round"/></svg></span>How to play</button>
+            <button type="button" data-page="settings"><span class="nav-icon" aria-hidden="true"><svg class="nav-vector" viewBox="0 0 48 48"><path d="m21 3-1 5-4 2-4-3-5 5 3 4-2 4-5 1v6l5 1 2 4-3 4 5 5 4-3 4 2 1 5h6l1-5 4-2 4 3 5-5-3-4 2-4 5-1v-6l-5-1-2-4 3-4-5-5-4 3-4-2-1-5Z" fill="url(#navGlass)" stroke="url(#navEdge)" stroke-width="2" stroke-linejoin="round"/><circle cx="24" cy="24" r="7" fill="#513571" stroke="#fff1ff" stroke-width="2.2"/></svg></span>Settings</button>
+        </nav>
+        </div>
+        </aside>
+        <section id="page-home" class="hub-page hidden">
+            <div class="welcome"><h1 id="welcomeTitle">Tara, laro tayo!</h1><p>Find your rhythm. Clear a line. Keep climbing.</p></div>
+            <section class="friends-panel" aria-labelledby="friendsTitle">
+                <div class="friends-heading"><h2 id="friendsTitle">Favorites/Online</h2></div>
+                <div id="friendsList" class="friends-list" role="region" aria-labelledby="friendsTitle" tabindex="0" aria-live="polite"><p class="friends-empty">Finding online players…</p></div>
+            </section>
+            <button class="marathon-progress" type="button" data-page="profile"><span class="progress-star" aria-hidden="true"><img class="glass-glyph" src="Assets/dashboard/icons/star.png" alt=""></span><strong>Marathon Progress</strong><progress id="milestoneProgress" max="2000" value="0" aria-label="Marathon milestone progress"></progress><span><b id="milestoneRemaining">2,000 points</b> to next milestone!</span><span class="progress-arrow" aria-hidden="true"></span></button>
+            <div class="online-invite"><span class="invite-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></span><div><p class="eyebrow">BETTER WITH A RIVAL</p><h2>Play together. Race to 40.</h2><p>Invite a friend or find an opponent online.</p></div><button type="button" data-page="online">Play online</button></div>
+            <div class="section-heading"><h2><span class="heading-icon" aria-hidden="true"><img class="glass-glyph" src="Assets/dashboard/icons/gamepad.png" alt=""></span> Choose your game</h2><span>Solo play</span></div>
+            <div class="mode-grid">
+                <button class="mode-card featured" type="button" data-mode="marathon"><span class="mode-symbol">&#9728;</span><svg class="mode-pictogram marathon-pictogram" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="marathonCup" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff8bc"/><stop offset=".48" stop-color="#ffd249"/><stop offset="1" stop-color="#ec9018"/></linearGradient></defs><path d="M18 10h28v17c0 11-6 18-14 18s-14-7-14-18Z" fill="url(#marathonCup)" stroke="#94410d" stroke-width="3" stroke-linejoin="round"/><path d="M18 15H9v9c0 8 4 12 11 13m26-22h9v9c0 8-4 12-11 13M32 45v8m-12 3h24" fill="none" stroke="#94410d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="m32 17 2.6 5.5 6 .9-4.3 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.3-4.2 6-.9Z" fill="#fff7ad" stroke="#bc6515" stroke-width="1.4"/><path d="M21 13h22" stroke="#fffbe1" stroke-width="2" stroke-linecap="round"/></svg><span class="mode-tag">THE CLASSIC</span><strong>Marathon</strong><span>Keep clearing lines as the pace increases. How far can you go?</span><b>Play Marathon</b></button>
+                <button class="mode-card" type="button" data-mode="sprint"><span class="mode-symbol">&#9889;</span><svg class="mode-pictogram sprint-pictogram" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="sprintClock" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffe0d6"/><stop offset=".48" stop-color="#ff7184"/><stop offset="1" stop-color="#dc244b"/></linearGradient></defs><circle cx="32" cy="33" r="25" fill="url(#sprintClock)" stroke="#9b1733" stroke-width="3"/><circle cx="32" cy="33" r="20" fill="none" stroke="#fff0e6" stroke-opacity=".8" stroke-width="2"/><path d="M32 15v3m0 30v3M14 33h3m30 0h3" stroke="#a4223a" stroke-width="2" stroke-linecap="round"/><path d="M32 23v11l8 7" fill="none" stroke="#94152e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="33" r="3" fill="#fff2df"/><path d="M19 15c4-3 8-4 13-4" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="2" stroke-linecap="round"/></svg><span class="mode-tag">RACE THE CLOCK</span><strong>40-line Sprint</strong><span>Clear 40 lines in the shortest time. Every placement counts.</span><b>Play Sprint</b></button>
+                <button class="mode-card" type="button" data-mode="blitz"><span class="mode-symbol">&#9687;</span><svg class="mode-pictogram blitz-pictogram" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="blitzBolt" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d8f4ff"/><stop offset=".45" stop-color="#64b7ff"/><stop offset="1" stop-color="#234ced"/></linearGradient></defs><path d="M38 4 10 36h19l-4 24 29-34H35Z" fill="url(#blitzBolt)" stroke="#173caa" stroke-width="2.5" stroke-linejoin="round"/><path d="m35 10-19 23h15m-2 18 19-22H34" fill="none" stroke="#e3f8ff" stroke-opacity=".8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="mode-tag">TWO MINUTES</span><strong>Blitz</strong><span>Score as much as you can before the two-minute timer ends.</span><b>Play Blitz</b></button>
+                <button class="mode-card" type="button" data-mode="practice"><span class="mode-symbol">&#10047;</span><svg class="mode-pictogram practice-pictogram" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="practiceTarget" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d4ffe0"/><stop offset=".5" stop-color="#62e8a4"/><stop offset="1" stop-color="#0cab71"/></linearGradient></defs><circle cx="32" cy="32" r="25" fill="url(#practiceTarget)" stroke="#086246" stroke-width="3"/><circle cx="32" cy="32" r="16" fill="none" stroke="#fff9de" stroke-width="3"/><circle cx="32" cy="32" r="6" fill="#fff8ae" stroke="#0d875b" stroke-width="2"/><path d="M32 2v13M32 49v13M2 32h13M49 32h13" stroke="#e9ffef" stroke-width="3" stroke-linecap="round"/><path d="M18 16c4-3 8-5 13-5" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="2.5" stroke-linecap="round"/></svg><span class="practice-tetromino" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="mode-tag">LEARN AT YOUR PACE</span><strong>Practice</strong><span>No automatic falling. Move and drop pieces when you are ready.</span><b>Start practicing</b></button>
+            </div>
+            <div class="section-heading"><h2><span class="heading-icon" aria-hidden="true"><img class="glass-glyph" src="Assets/dashboard/icons/clock.png" alt=""></span> Recent games</h2><button class="text-button" type="button" data-page="profile">View all</button></div><div class="history-list"><article id="unfinishedMatch" class="history-row unfinished-match hidden"><span class="history-dot" aria-hidden="true">&#9671;</span><div><strong id="unfinishedMode">Unfinished game</strong><small id="unfinishedDetails"></small></div><button id="resumeMatch" class="resume-match" type="button">Resume</button></article><div id="homeHistory"></div></div>
+        </section>
+
+        <section id="page-online" class="hub-page hidden">
+            <p class="eyebrow">A LITTLE FRIENDLY COMPETITION</p><h1>Play online</h1>
+            <p class="muted">Two players. The same piece sequence. First to clear 40 lines wins—or survive when your opponent tops out.</p>
+            <p id="onlineStatus" class="online-status" role="status">Connecting to the multiplayer server…</p>
+            <section class="all-friends-panel" aria-labelledby="allFriendsTitle"><h2 id="allFriendsTitle">Favorites/Online</h2><div id="allFriendsList" class="all-friends-list" aria-live="polite"></div></section>
+            <div id="onlineChoices" class="online-choices">
+                <article class="guide-card"><h2>Invite a friend</h2><p>Create a private room and share its code or invite link.</p><button id="createOnlineRoom" type="button">Create room</button></article>
+                <article class="guide-card"><h2>Join a friend</h2><form id="joinOnlineForm"><label for="onlineRoomCode">Invite code</label><input id="onlineRoomCode" maxlength="7" pattern="[A-Fa-f0-9]{7}" placeholder="Room code" required autocomplete="off"><button type="submit">Join room</button></form></article>
+                <article class="guide-card"><h2>Find an opponent</h2><p>Join the public queue. Your match starts when another player joins.</p><button id="findOnlineMatch" type="button">Find a match</button></article>
+            </div>
+            <div id="onlineLobby" class="online-lobby hidden"><p class="eyebrow" id="onlineLobbyLabel">PRIVATE ROOM</p><h2 id="onlineLobbyTitle">Waiting for a friend</h2><strong id="onlineInviteCode"></strong><p id="onlineOpponentStatus"></p><button id="copyOnlineInvite" type="button">Copy invite link</button><button id="cancelOnlineRoom" type="button">Leave room / cancel search</button></div>
+            <p id="onlineError" class="online-error" role="alert"></p>
+
+        </section>
+        <section id="page-profile" class="hub-page hidden">
+            <p class="eyebrow">YOUR PLAYER CARD</p><h1>Profile</h1>
+            <div class="profile-card"><div id="profileAvatar" class="large-avatar"><img class="profile-photo" src="Assets/dashboard/default-profile-transparent.png" alt=""></div><div><h2 id="profileTitle">Player</h2><p id="profileAccount" class="muted"></p><p id="profileJoined" class="muted"></p></div></div>
+            <form id="profileForm" class="hub-form"><label>Display name<input id="profileName" maxlength="24" required autocomplete="nickname"></label><label>Avatar<select id="profileIcon"><option value="default">Default photo</option><option value="&#9733;">&#9733; Star</option><option value="&#129413;">&#129413; Eagle</option><option value="&#9728;">&#9728; Sun</option><option value="&#127802;">&#127802; Flower</option><option value="&#9889;">&#9889; Lightning</option></select></label><button type="submit">Save profile</button></form>
+            <div id="profileStats" class="summary-strip"></div><h2 class="section-title">Milestones</h2><div id="achievements" class="achievement-grid"></div><h2 class="section-title">Match history</h2><div id="profileHistory" class="history-list"></div>
+            <button id="signOutButton" class="text-button" type="button">Sign out / switch player</button>
+        </section>
+        <section id="page-leaderboard" class="hub-page hidden"><nav class="leaderboard-navigation" aria-label="Leaderboard navigation"><button type="button" class="leaderboard-back" data-page="home"><span aria-hidden="true">&#8592;</span> Back</button></nav><div class="leaderboard-board"><h1 class="leaderboard-title-tab">Leaderboard</h1><div class="leaderboard-board-top"><p>LOCAL RANKINGS</p><label class="leaderboard-mode">Game mode<select id="leaderboardMode"><option value="marathon">Marathon</option><option value="sprint">40-line Sprint</option><option value="blitz">Blitz</option></select></label></div><div id="leaderboardList"></div><p class="leaderboard-footnote">Rating compares each player's best result with the mode leader (100). Results are saved on this browser; Practice is excluded.</p></div></section>
+        <section id="page-guide" class="hub-page">
+<header class="learn-header"><p class="eyebrow">LEARN THE BASICS</p><h1><span class="learn-sun" aria-hidden="true">&#9728;</span>HOW TO PLAY</h1></header>
+<div class="learn-grid">
+<article class="learn-card learn-objective"><h2><span class="learn-number">1</span>Objective</h2><div class="learn-objective-body"><div><p>Stack, clear, and repeat. Fill a horizontal row of 10 blocks to clear it. The blocks above fall down.</p><p>Keep room at the top: the game ends when a new piece cannot enter. Enable the ghost piece in Settings to preview where your piece will land.</p></div><div class="learn-board-demo" aria-label="Example: fill all 10 spaces to clear a row"><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class="is-block"></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class="is-block"></i><i class="is-block"></i><i class="is-block"></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class="is-full"></i><i class=""></i><i class=""></i><i class="is-block"></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class="is-block"></i></div></div></article>
+<article class="learn-card learn-pieces"><h2><span class="learn-number">2</span>Pieces</h2><p>Seven different shapes, each made of four blocks.</p><div class="learn-piece-list"><div class="learn-piece"><div><svg viewBox="0 0 80 80" aria-hidden="true"><rect x="2" y="21" width="17" height="17" rx="2" fill="#42c6d9" stroke="#ffffff88"/><rect x="21" y="21" width="17" height="17" rx="2" fill="#42c6d9" stroke="#ffffff88"/><rect x="40" y="21" width="17" height="17" rx="2" fill="#42c6d9" stroke="#ffffff88"/><rect x="59" y="21" width="17" height="17" rx="2" fill="#42c6d9" stroke="#ffffff88"/></svg></div><b>I</b></div><div class="learn-piece"><div><svg viewBox="0 0 61 61" aria-hidden="true"><rect x="40" y="2" width="17" height="17" rx="2" fill="#ef9d35" stroke="#ffffff88"/><rect x="2" y="21" width="17" height="17" rx="2" fill="#ef9d35" stroke="#ffffff88"/><rect x="21" y="21" width="17" height="17" rx="2" fill="#ef9d35" stroke="#ffffff88"/><rect x="40" y="21" width="17" height="17" rx="2" fill="#ef9d35" stroke="#ffffff88"/></svg></div><b>L</b></div><div class="learn-piece"><div><svg viewBox="0 0 61 61" aria-hidden="true"><rect x="2" y="2" width="17" height="17" rx="2" fill="#3f78d1" stroke="#ffffff88"/><rect x="2" y="21" width="17" height="17" rx="2" fill="#3f78d1" stroke="#ffffff88"/><rect x="21" y="21" width="17" height="17" rx="2" fill="#3f78d1" stroke="#ffffff88"/><rect x="40" y="21" width="17" height="17" rx="2" fill="#3f78d1" stroke="#ffffff88"/></svg></div><b>J</b></div><div class="learn-piece"><div><svg viewBox="0 0 42 42" aria-hidden="true"><rect x="2" y="2" width="17" height="17" rx="2" fill="#f4d447" stroke="#ffffff88"/><rect x="21" y="2" width="17" height="17" rx="2" fill="#f4d447" stroke="#ffffff88"/><rect x="2" y="21" width="17" height="17" rx="2" fill="#f4d447" stroke="#ffffff88"/><rect x="21" y="21" width="17" height="17" rx="2" fill="#f4d447" stroke="#ffffff88"/></svg></div><b>O</b></div><div class="learn-piece"><div><svg viewBox="0 0 61 61" aria-hidden="true"><rect x="21" y="2" width="17" height="17" rx="2" fill="#48b96c" stroke="#ffffff88"/><rect x="40" y="2" width="17" height="17" rx="2" fill="#48b96c" stroke="#ffffff88"/><rect x="2" y="21" width="17" height="17" rx="2" fill="#48b96c" stroke="#ffffff88"/><rect x="21" y="21" width="17" height="17" rx="2" fill="#48b96c" stroke="#ffffff88"/></svg></div><b>S</b></div><div class="learn-piece"><div><svg viewBox="0 0 61 61" aria-hidden="true"><rect x="2" y="2" width="17" height="17" rx="2" fill="#e95454" stroke="#ffffff88"/><rect x="21" y="2" width="17" height="17" rx="2" fill="#e95454" stroke="#ffffff88"/><rect x="21" y="21" width="17" height="17" rx="2" fill="#e95454" stroke="#ffffff88"/><rect x="40" y="21" width="17" height="17" rx="2" fill="#e95454" stroke="#ffffff88"/></svg></div><b>Z</b></div><div class="learn-piece"><div><svg viewBox="0 0 61 61" aria-hidden="true"><rect x="21" y="2" width="17" height="17" rx="2" fill="#a866c7" stroke="#ffffff88"/><rect x="2" y="21" width="17" height="17" rx="2" fill="#a866c7" stroke="#ffffff88"/><rect x="21" y="21" width="17" height="17" rx="2" fill="#a866c7" stroke="#ffffff88"/><rect x="40" y="21" width="17" height="17" rx="2" fill="#a866c7" stroke="#ffffff88"/></svg></div><b>T</b></div></div><p class="learn-note">Use Hold to store a piece. Press Hold again to swap it with the current piece. The next five pieces appear beside the board.</p></article>
+<article class="learn-card learn-touch"><h2><span class="learn-number">3</span>Controls (touch &amp; mouse)</h2><p><strong>Mouse:</strong> Point over the board to move. Scroll the mouse wheel to rotate; left-click to hard drop.<br><strong>Touch:</strong> Use gestures directly on the board.</p><div class="learn-gestures"><div class="learn-gesture"><span aria-hidden="true">&#8592;</span><strong>Swipe left</strong><small>Move left</small></div><div class="learn-gesture"><span aria-hidden="true">&#8594;</span><strong>Swipe right</strong><small>Move right</small></div><div class="learn-gesture"><span aria-hidden="true">&#8595;</span><strong>Swipe down</strong><small>Drop one row</small></div><div class="learn-gesture"><span aria-hidden="true">&#8593;</span><strong>Swipe up</strong><small>Hard drop</small></div><div class="learn-gesture"><span aria-hidden="true">&#8635;</span><strong>Tap</strong><small>Rotate clockwise</small></div><div class="learn-gesture"><span aria-hidden="true">&#10074;&#10074;</span><strong>Hold 0.6s</strong><small>Pause solo game</small></div></div><p class="learn-note">Tap a paused solo board to resume. Tap after game over to restart.</p></article>
+<article class="learn-card learn-keyboard"><h2><span class="learn-number">4</span>Controls (keyboard)</h2><dl class="learn-keyboard-list"><div><dt><kbd id="guideKey-leftRight">&larr; / &rarr;</kbd></dt><dd>Move left / right</dd></div><div><dt><kbd id="guideKey-rotateCW">&uarr; / X</kbd></dt><dd>Rotate clockwise</dd></div><div><dt><kbd id="guideKey-rotateCCW">Z</kbd></dt><dd>Rotate counterclockwise</dd></div><div><dt><kbd id="guideKey-softDrop">&darr;</kbd></dt><dd>Soft drop</dd></div><div><dt><kbd id="guideKey-hardDrop">Space</kbd></dt><dd>Hard drop</dd></div><div><dt><kbd id="guideKey-hold">C / Shift</kbd></dt><dd>Hold / swap held piece</dd></div><div><dt><kbd id="guideKey-pause">P / R</kbd></dt><dd>Pause / restart (solo)</dd></div></dl><p class="learn-note">Keys reflect your current Settings. Online races continue while the menu is open.</p></article>
+<article class="learn-card learn-scoring"><h2><span class="learn-number">5</span>Scoring</h2><p>Clear several lines at once for more points.</p><div class="learn-scores"><div class="learn-score"><strong>1 line</strong><b>100 &times; Level</b><span class="learn-score-blocks" style="--rows:1"><i></i><i></i><i></i><i></i></span></div><div class="learn-score"><strong>2 lines</strong><b>300 &times; Level</b><span class="learn-score-blocks" style="--rows:2"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="learn-score"><strong>3 lines</strong><b>500 &times; Level</b><span class="learn-score-blocks" style="--rows:3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="learn-score"><strong>4 lines</strong><b>800 &times; Level</b><span class="learn-score-blocks" style="--rows:4"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div></div><p class="learn-note">Soft drop: +1 per row. Hard drop: +2 per row. Combos, T-Spins, back-to-back clears, and perfect clears earn bonuses.</p></article>
+<article class="learn-card learn-modes"><h2><span class="learn-number">6</span>Game modes</h2><div class="learn-mode-list"><div><span class="learn-mode-icon" aria-hidden="true">&#8734;</span><strong>Marathon</strong><p>Keep clearing lines. Every 10 lines raises the level and falling speed. Ends when you top out.</p></div><div><span class="learn-mode-icon" aria-hidden="true">&#9873;</span><strong>40-line Sprint</strong><p>Clear 40 lines as quickly as you can.</p></div><div><span class="learn-mode-icon" aria-hidden="true">&#9889;</span><strong>Blitz</strong><p>Score as much as possible in 2 minutes of active play.</p></div><div><span class="learn-mode-icon" aria-hidden="true">&#9678;</span><strong>Practice</strong><p>No automatic falling by default. Enable gravity in Settings. Unranked.</p></div><div><span class="learn-mode-icon" aria-hidden="true">&#9876;</span><strong>Online Versus</strong><p>Same piece sequence. First to 40 lines wins, or survive when your opponent tops out.</p></div></div></article>
+</div></section>
+        <section id="page-settings" class="hub-page hidden"><p class="eyebrow">MAKE IT YOUR GAME</p><h1>Settings</h1><form id="settingsForm" class="settings-list"><label class="setting-row"><span><strong>Ghost piece</strong><small>Preview where the current piece will land.</small></span><input id="settingGhost" type="checkbox"></label><label class="setting-row"><span><strong>Visual effects</strong><small>Block impacts and line-clear particles.</small></span><input id="settingEffects" type="checkbox"></label><label class="setting-row"><span><strong>Sound effects</strong><small>A short tone when a piece locks or a match ends.</small></span><input id="settingSound" type="checkbox"></label><label class="setting-row"><span><strong>Vibration</strong><small>Feedback on supported phones.</small></span><input id="settingVibration" type="checkbox"></label><label class="setting-row"><span><strong>Appearance</strong><small>Choose your preferred contrast.</small></span><select id="settingTheme"><option value="fiesta">Fiesta</option><option value="night">Night</option></select></label><label class="setting-row"><span><strong>Grid lines</strong><small>Show the board grid.</small></span><input id="settingGrid" type="checkbox"></label><label class="setting-row"><span><strong>Practice gravity</strong><small>Let pieces fall automatically in Practice.</small></span><input id="settingPracticeGravity" type="checkbox"></label><label class="setting-row"><span><strong>Practice placement hints</strong><small>Show placement help in Practice.</small></span><input id="settingPracticeHints" type="checkbox"></label><div class="game-setting-group"><h2>Game speed and audio</h2><label>Practice fall interval (ms)<input id="settingPracticeSpeed" type="number" min="100" max="3000" step="50"></label><label>DAS (ms)<input id="settingDas" type="number" min="50" max="500" step="10"></label><label>ARR (ms)<input id="settingArr" type="number" min="10" max="150" step="5"></label><label>Soft drop multiplier<input id="settingSoftDropFactor" type="number" min="2" max="100" step="1"></label><label>Music volume<input id="settingMusicVolume" type="range" min="0" max="100"></label><label>Sound effects volume<input id="settingSoundVolume" type="range" min="0" max="100"></label></div><div class="game-setting-group"><h2>Keyboard controls</h2><label>Move left<select id="controlLeft"><option value="ArrowLeft">&larr; Arrow</option><option value="KeyA">A</option></select></label><label>Move right<select id="controlRight"><option value="ArrowRight">&rarr; Arrow</option><option value="KeyD">D</option></select></label><label>Soft drop<select id="controlSoftDrop"><option value="ArrowDown">&darr; Arrow</option><option value="KeyS">S</option></select></label><label>Hard drop<select id="controlHardDrop"><option value="Space">Space</option><option value="KeyW">W</option></select></label><label>Rotate clockwise<select id="controlRotateCW"><option value="ArrowUp">&uarr; Arrow</option><option value="KeyX">X</option></select></label><label>Rotate counterclockwise<select id="controlRotateCCW"><option value="KeyZ">Z</option><option value="KeyQ">Q</option></select></label><label>Hold<select id="controlHold"><option value="KeyC">C</option><option value="ShiftLeft">Shift</option></select></label></div><button id="toggleFullscreen" type="button">Toggle fullscreen</button><button type="submit">Save settings</button></form></section>
+        <section id="page-results" class="hub-page hidden"><div class="result-hero"><p class="eyebrow" id="resultMode">MARATHON</p><h1 id="resultTitle">Nice game!</h1><p id="resultDescription"></p></div><div id="resultStats" class="summary-strip"></div><p id="resultRecord" class="record-message"></p><div class="result-actions"><button id="playAgain" type="button">Play again</button><button type="button" data-page="home">Choose another mode</button><button type="button" data-page="leaderboard">View leaderboard</button></div></section>
+        <p id="hubNotice" class="hub-notice" role="status"></p>
+    </main>
+    <dialog id="matchMenu" class="match-menu"><h2>Take a breather</h2><p>Your game is paused.</p><div class="match-menu-actions"><button id="menuResume" type="button">Resume game</button><button id="leaveOnlineMatch" class="hidden" type="button">Leave match (forfeit)</button><button id="menuRestart" type="button">Restart game</button><button type="button" data-game-page="settings">Settings</button><button type="button" data-game-page="guide">How to play</button><button type="button" data-game-page="home">Back to home</button></div></dialog>
+
+    <div id="gameScreen" class="game hidden">
+        <header class="brand">
+            <div class="match-toolbar"><button id="openMatchMenu" type="button" aria-label="Open game menu">&#9776; Menu</button><span id="matchModeLabel">Marathon</span><span id="matchClock">0:00</span><button id="pauseButton" type="button" class="menu-button">Pause</button></div>
+            <div class="brand-row">
+                <div>
+                    <p class="small-title">LARO NG BAYAN</p>
+                    <h1 aria-label="Tetris Pinas">T<span class="eagle-e" aria-hidden="true"><svg class="eagle-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g class="eagle-wing wing-left"><path d="M48 49 7 13 12 40 3 29 9 54 3 47 14 67 43 61Z" fill="#8b542e" stroke="#edc281" stroke-width="2"/><path d="M43 54 15 29M40 59 13 45" fill="none" stroke="#f5d7a0" stroke-width="3"/></g><g class="eagle-wing wing-right"><path d="M52 49 93 13 88 40 97 29 91 54 97 47 86 67 57 61Z" fill="#8b542e" stroke="#edc281" stroke-width="2"/><path d="M57 54 85 29M60 59 87 45" fill="none" stroke="#f5d7a0" stroke-width="3"/></g><path d="M44 62 37 88 50 81 63 88 56 62Z" fill="#bb8042" stroke="#f5d7a0" stroke-width="2"/><ellipse cx="50" cy="57" rx="11" ry="19" fill="#fff1cd"/><path d="M40 42 42 27 48 32 51 23 55 32 60 29 59 43Z" fill="#fff1cd"/><path d="M53 39 68 43 56 48Z" fill="#ffc64b"/><circle cx="54" cy="37" r="2" fill="#25160d"/></svg></span>TRIS <span>PINAS</span></h1>
+                </div>
+            </div>
+            <p class="location">&#9733; PHILIPPINE EAGLE MODE &#9733;</p>
+        </header>
+        <section class="side-panel left-panel" aria-label="Game statistics">
+            <div id="opponentCard" class="opponent-card hidden"><div class="opponent-heading"><span class="opponent-avatar" aria-hidden="true">&#9733;</span><p id="opponentName">Opponent</p><span class="opponent-live">LIVE</span></div><canvas id="opponentCanvas" width="100" height="200" aria-label="Live opponent board"></canvas><small id="opponentProgress">0 / 40 lines</small></div>
+            <div class="info-card"><p>SCORE</p><h2 id="score">0</h2></div>
+            <div class="info-card"><p>LEVEL</p><h2 id="level">1</h2></div>
+            <div class="info-card"><p>LINES</p><h2 id="lines">0</h2></div>
+            <div class="game-mode-info" id="gameModeInfo" aria-live="polite"></div>
+            <progress id="gameLevelProgress" max="10" value="0" aria-label="Lines until next level"></progress>
+        </section>
+        <main class="center">
+            <div class="board-frame">
+                <canvas id="gameCanvas" width="300" height="600" aria-label="Tetris game board"></canvas>
+                <div id="gameMessage" class="game-message hidden">
+                    <h2 id="messageTitle">PAUSED</h2>
+                    <p id="messageText">Press P to continue</p>
+                </div>
+            </div>
+            <div id="comboMessage" class="combo-message" aria-live="polite"></div>
+        </main>
+        <section class="side-panel right-panel" aria-label="Held and upcoming pieces">
+            <div class="hold-card"><p>HOLD <span id="holdStatus"></span><small>C / Shift</small></p><canvas id="holdCanvas" width="140" height="100" aria-label="Held Tetris piece"></canvas></div>
+            <div class="next-card">
+                <p>NEXT 5</p>
+                <canvas id="nextCanvas" width="140" height="400" aria-label="Next five Tetris pieces"></canvas>
+            </div>
+        </section>
+    </div>
+
+    
+    
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBigJN7YHRYoDRQe41F1xY1ZKhkSTcrUuw",
+            authDomain: "tetris-pinas.firebaseapp.com",
+            projectId: "tetris-pinas",
+            storageBucket: "tetris-pinas.firebasestorage.app",
+            messagingSenderId: "656081612371",
+            appId: "1:656081612371:web:bcceef8e3687451c3ea0a6",
+            measurementId: "G-K7QEPCRT6L"
+        };
+
+        const hasRealFirebaseConfig = Object.values(firebaseConfig).every(value => {
+            return typeof value === "string" && value && !value.startsWith("YOUR_");
+        });
+
+        if (hasRealFirebaseConfig && window.firebase) {
+            firebase.initializeApp(firebaseConfig);
+        } else {
+            console.warn("Firebase is not configured yet. Add your real project values in index.html to enable authentication.");
+        }
+    </script>
+    
+    
+    
+    
+    
+</body>
+</html>
